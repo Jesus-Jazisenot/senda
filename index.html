@@ -1,0 +1,3560 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>SENDA · Árbol del Hombre Completo</title>
+<style>
+  :root{
+    --bg:#0a0c10;
+    --bg2:#0d1117;
+    --ink:#e6ddc8;
+    --muted:#8a8470;
+    --line:#1c2128;
+    --gold:#c9a84a;
+    --gold-soft:#7a6630;
+    --locked:#3a3d44;
+    --done:#d4af37;
+    /* colores de rama */
+    --r-mente:#5b8dd9;
+    --r-poder:#c0473f;
+    --r-cuerpo:#4ca96b;
+    --r-dinero:#3fa3a3;
+    --r-alma:#9b6bd6;
+    --r-social:#d98a3f;
+    --panel:#10141b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    overflow:hidden;overscroll-behavior:none}
+  .ui-font{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+
+  /* ---- HUD superior ---- */
+  #hud{position:fixed;top:0;left:0;right:0;z-index:40;
+    padding:10px 14px;display:flex;align-items:center;gap:14px;
+    background:linear-gradient(180deg,rgba(8,9,12,.96),rgba(8,9,12,.55) 70%,transparent);
+    pointer-events:none}
+  #hud > *{pointer-events:auto}
+  .brand{font-size:15px;letter-spacing:.32em;color:var(--gold);font-weight:600}
+  .brand small{display:block;letter-spacing:.12em;font-size:9px;color:var(--muted);margin-top:2px}
+  .lvlbox{margin-left:auto;text-align:right;min-width:120px}
+  .lvlnum{font-size:13px;letter-spacing:.18em;color:var(--ink)}
+  .lvlnum b{color:var(--gold);font-size:18px}
+  .xpbar{height:5px;background:#1b1f27;border-radius:3px;margin-top:5px;overflow:hidden;width:160px}
+  .xpfill{height:100%;width:0;background:linear-gradient(90deg,var(--gold-soft),var(--gold));
+    transition:width .6s cubic-bezier(.2,.8,.2,1)}
+  .xpsub{font-size:9px;color:var(--muted);margin-top:3px;letter-spacing:.1em}
+
+  /* ---- lienzo ---- */
+  #stage{position:fixed;inset:0;touch-action:none}
+  #world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+  svg.lines{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+  .node{position:absolute;transform:translate(-50%,-50%);cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:5px;user-select:none}
+  .glyph{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
+    border:1.5px solid var(--locked);background:#0e1218;position:relative;
+    transition:transform .18s,box-shadow .25s,border-color .25s;font-size:20px}
+  .node.core .glyph{width:78px;height:78px;font-size:30px;border-width:2px}
+  .node.major .glyph{width:58px;height:58px;font-size:24px}
+  .node .lbl{font-size:10.5px;letter-spacing:.06em;text-align:center;max-width:94px;
+    line-height:1.2;color:var(--muted);transition:color .25s}
+  .node.major .lbl,.node.core .lbl{font-size:12px;color:var(--ink);letter-spacing:.08em}
+
+  .node.available .glyph{border-color:var(--bcol);box-shadow:0 0 14px -2px var(--bcol)}
+  .node.available .lbl{color:var(--ink)}
+  .node.done .glyph{border-color:var(--done);background:radial-gradient(circle at 50% 40%,var(--bcol),#0e1218 75%);
+    box-shadow:0 0 18px -1px var(--bcol)}
+  .node.done .lbl{color:var(--ink)}
+  .node.locked .glyph{opacity:.42;filter:grayscale(.6)}
+  .node.locked{cursor:not-allowed}
+  .node:active .glyph{transform:scale(.92)}
+  .glyph .ring{position:absolute;inset:-6px;border-radius:50%;border:1px solid transparent}
+  .node.available .glyph .ring{border-color:var(--bcol);opacity:.35;animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:.12}50%{transform:scale(1.12);opacity:.4}}
+  .check{position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:50%;
+    background:var(--done);color:#1a1405;display:none;place-items:center;font-size:11px;font-weight:bold}
+  .node.done .check{display:grid}
+
+  /* ---- controles flotantes ---- */
+  #fab{position:fixed;right:12px;bottom:16px;z-index:40;display:flex;flex-direction:column;gap:9px}
+  .fbtn{width:46px;height:46px;border-radius:14px;background:var(--panel);border:1px solid var(--line);
+    color:var(--ink);font-size:19px;display:grid;place-items:center;cursor:pointer;
+    box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  .fbtn:active{transform:scale(.92)}
+  #legend{position:fixed;left:12px;bottom:16px;z-index:35;display:flex;flex-wrap:wrap;gap:6px;max-width:62vw}
+  .lg{font-size:9px;letter-spacing:.05em;padding:4px 8px;border-radius:20px;
+    background:rgba(16,20,27,.82);border:1px solid var(--line);color:var(--muted);
+    display:flex;align-items:center;gap:5px;cursor:pointer;transition:.2s}
+  .lg .dot{width:8px;height:8px;border-radius:50%}
+  .lg.off{opacity:.32}
+
+  /* ---- panel de detalle ---- */
+  #scrim{position:fixed;inset:0;background:rgba(4,5,8,.66);backdrop-filter:blur(3px);
+    z-index:50;opacity:0;pointer-events:none;transition:opacity .25s}
+  #scrim.on{opacity:1;pointer-events:auto}
+  #sheet{position:fixed;left:0;right:0;bottom:0;z-index:55;max-height:88vh;
+    background:linear-gradient(180deg,#11151d,#0b0e13);
+    border-top:1px solid var(--bcol,#2a2f38);border-radius:20px 20px 0 0;
+    transform:translateY(102%);transition:transform .34s cubic-bezier(.2,.85,.2,1);
+    display:flex;flex-direction:column;box-shadow:0 -10px 40px rgba(0,0,0,.6)}
+  #sheet.on{transform:translateY(0)}
+  .grip{width:38px;height:4px;border-radius:3px;background:#333a44;margin:9px auto 2px}
+  .shead{padding:6px 22px 14px;border-bottom:1px solid var(--line)}
+  .eyebrow{font-size:9.5px;letter-spacing:.26em;color:var(--bcol);text-transform:uppercase}
+  .stitle{font-size:23px;letter-spacing:.01em;margin:7px 0 3px;line-height:1.1}
+  .smeta{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:7px}
+  .smeta b{color:var(--ink);font-weight:600}
+  .sbody{padding:16px 22px 8px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .block{margin-bottom:20px}
+  .blab{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);
+    margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .blab::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--gold-soft),transparent)}
+  .why{font-size:14.5px;line-height:1.6;color:#cfc6b0;font-style:italic;
+    border-left:2px solid var(--bcol);padding-left:14px}
+  .evidence{font-size:13px;line-height:1.6;color:#bfe0d8;background:rgba(90,176,168,.07);
+    border:1px solid rgba(90,176,168,.22);border-radius:11px;padding:12px 14px;position:relative}
+  .evidence::before{content:"🔬";position:absolute;top:-10px;left:12px;background:#0d1117;padding:0 5px;font-size:13px}
+  .studylink{display:inline-block;margin-top:10px;font-size:11.5px;color:#7fcec2;text-decoration:none;
+    border-bottom:1px dotted #4a8c84;padding-bottom:1px}
+  .studylink:active{color:#bfe0d8}
+  .list{list-style:none;padding:0;margin:0;font-size:13.5px;line-height:1.55}
+  .list li{padding:8px 0 8px 22px;position:relative;border-bottom:1px solid #14181f;color:#d2cab4}
+  .list li::before{content:"";position:absolute;left:4px;top:15px;width:6px;height:6px;
+    border-radius:50%;background:var(--bcol)}
+  .para{position:relative}
+  .para::before{content:"⚠";background:none;color:var(--r-poder);font-size:13px;top:8px;left:2px;width:auto;height:auto;border-radius:0}
+  .links{display:flex;flex-wrap:wrap;gap:8px}
+  .links a{font-size:12px;color:var(--bcol);text-decoration:none;border:1px solid var(--bcol);
+    padding:6px 12px;border-radius:20px;opacity:.85}
+  .links a:active{opacity:1}
+  .stepwrap{display:flex;flex-direction:column;gap:7px}
+  .step{display:flex;gap:10px;font-size:13px;align-items:flex-start}
+  .step .n{flex:none;width:20px;height:20px;border-radius:50%;background:var(--bcol);
+    color:#0a0c10;font-size:11px;font-weight:bold;display:grid;place-items:center;margin-top:1px}
+  /* hábitos */
+  .habits{display:flex;flex-direction:column;gap:8px}
+  .habit{display:flex;align-items:center;gap:10px;font-size:13px;background:#0e1218;
+    border:1px solid var(--line);border-radius:11px;padding:9px 12px}
+  .habit .hx{width:22px;height:22px;border-radius:6px;border:1.5px solid var(--bcol);
+    flex:none;display:grid;place-items:center;cursor:pointer;font-size:13px}
+  .habit.hon .hx{background:var(--bcol);color:#0a0c10}
+  .habit.hon span{color:var(--muted);text-decoration:line-through}
+  .habit .streak{margin-left:auto;font-size:10px;color:var(--muted);white-space:nowrap}
+  .notebox{width:100%;background:#0e1218;border:1px solid var(--line);border-radius:11px;
+    color:var(--ink);padding:11px;font-family:inherit;font-size:13px;resize:vertical;min-height:60px}
+  /* prereq aviso */
+  .gate{font-size:12.5px;color:var(--r-poder);background:rgba(192,71,63,.08);
+    border:1px solid rgba(192,71,63,.3);border-radius:11px;padding:10px 12px;line-height:1.5}
+  .gate b{color:#e0857f}
+  /* footer accion */
+  .sfoot{padding:12px 22px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--line);
+    background:#0b0e13}
+  .cta{width:100%;border:none;border-radius:13px;padding:15px;font-size:15px;font-weight:600;
+    letter-spacing:.04em;cursor:pointer;font-family:inherit;background:var(--bcol);color:#0a0c10}
+  .cta.undo{background:transparent;border:1px solid var(--locked);color:var(--muted)}
+  .cta.disabled{background:#1a1e26;color:#555;cursor:not-allowed}
+
+  /* intro */
+  #intro{position:fixed;inset:0;z-index:80;background:radial-gradient(ellipse at 50% 40%,#11151d,#070809);
+    display:grid;place-items:center;text-align:center;padding:30px;transition:opacity .6s}
+  #intro h1{font-size:30px;letter-spacing:.18em;color:var(--gold);margin:0 0 6px;font-weight:600}
+  #intro p{color:var(--muted);font-size:13px;max-width:340px;line-height:1.7;margin:0 auto 26px}
+  #intro .go{background:var(--gold);color:#100c02;border:none;padding:14px 34px;border-radius:30px;
+    font-family:inherit;font-size:15px;letter-spacing:.1em;font-weight:600;cursor:pointer}
+  .hint{position:fixed;bottom:74px;left:50%;transform:translateX(-50%);z-index:30;
+    font-size:11px;color:var(--muted);background:rgba(10,12,16,.8);padding:6px 14px;border-radius:20px;
+    letter-spacing:.05em;opacity:0;transition:opacity .4s;pointer-events:none}
+  .toast{position:fixed;top:64px;left:50%;transform:translateX(-50%) translateY(-12px);z-index:70;
+    background:var(--gold);color:#100c02;padding:11px 20px;border-radius:30px;font-size:13px;
+    font-weight:600;letter-spacing:.04em;opacity:0;pointer-events:none;transition:.4s;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* panel resumen */
+  .sumhead{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px}
+  .sumhead b{color:var(--ink)}
+
+  /* tu verdadero norte */
+  .norte{background:linear-gradient(135deg,rgba(201,168,74,.12),rgba(201,168,74,.03));
+    border:1px solid rgba(201,168,74,.32);border-radius:14px;padding:16px 16px 17px;margin-bottom:18px;position:relative}
+  .norte-lab{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);
+    margin-bottom:9px;display:flex;align-items:center;gap:7px}
+  .norte-lab::before{content:"✦"}
+  .norte-msg{font-size:14px;line-height:1.62;color:#e0d8c2}
+  .verdict{display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap}
+  .vcard{flex:1;min-width:130px;border-radius:13px;padding:13px 14px;border:1px solid var(--line);background:#0e1218}
+  .vcard .vlab{font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+  .vcard .vname{font-size:17px;margin-top:5px;font-weight:600}
+  .vcard.strong{border-color:var(--done)}
+  .vcard.weak{border-color:#3a3d44}
+  .branchrow{margin-bottom:13px}
+  .brtop{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:5px}
+  .brtop .bn{display:flex;align-items:center;gap:7px}
+  .brtop .bn .dot{width:9px;height:9px;border-radius:50%}
+  .brtop .bp{font-size:11px;color:var(--muted)}
+  .brbar{height:7px;background:#161b22;border-radius:4px;overflow:hidden}
+  .brbar .fill{height:100%;border-radius:4px;transition:width .7s cubic-bezier(.2,.8,.2,1)}
+
+  /* rutas guiadas */
+  .paths{display:flex;flex-direction:column;gap:10px}
+  .pathcard{display:flex;gap:12px;align-items:center;background:#0e1218;border:1px solid var(--line);
+    border-radius:13px;padding:12px 13px}
+  .pc-ico{flex:none;width:38px;height:38px;border-radius:10px;background:#151a22;display:grid;
+    place-items:center;font-size:19px;color:var(--gold)}
+  .pc-body{flex:1;min-width:0}
+  .pc-name{font-size:14px;font-weight:600;color:var(--ink)}
+  .pc-desc{font-size:11px;color:var(--muted);line-height:1.45;margin:3px 0 7px}
+  .pc-bar{height:5px;background:#161b22;border-radius:3px;overflow:hidden}
+  .pc-fill{height:100%;background:linear-gradient(90deg,var(--gold-soft),var(--gold));border-radius:3px;transition:width .6s}
+  .pc-next{font-size:10px;color:var(--muted);margin-top:6px;letter-spacing:.02em}
+  .pc-next b{color:var(--ink)}
+  .pc-go{flex:none;align-self:stretch;display:flex;align-items:center;padding:0 12px;margin:-12px -13px -12px 0;
+    border-left:1px solid var(--line);color:var(--gold);font-size:12px;font-weight:600;cursor:pointer;
+    border-radius:0 13px 13px 0}
+  .pc-go:active{background:#151a22}
+
+  /* detector de abandono */
+  .alive{font-size:12.5px;color:#a9d8bb;background:rgba(76,169,107,.08);border:1px solid rgba(76,169,107,.25);
+    border-radius:10px;padding:10px 12px;line-height:1.5}
+  .stale{display:flex;align-items:center;gap:10px;background:rgba(192,71,63,.07);
+    border:1px solid rgba(192,71,63,.28);border-radius:11px;padding:11px 13px;margin-bottom:8px}
+  .st-l{flex:1;min-width:0}
+  .st-name{font-size:13.5px;color:#e0c0bc;font-weight:600}
+  .st-meta{font-size:10.5px;color:#b08a86;margin-top:3px}
+  .st-go{flex:none;color:#e0a09a;font-size:12px;font-weight:600;cursor:pointer;padding:6px 8px}
+  .st-go:active{opacity:.7}
+
+  /* SOS / urge surfing */
+  #sos{position:fixed;inset:0;z-index:90;background:radial-gradient(ellipse at 50% 38%,#0e1726,#06080c);
+    display:none;flex-direction:column;align-items:center;justify-content:center;padding:30px 26px;
+    text-align:center}
+  #sos.on{display:flex}
+  .sos-inner{max-width:380px;width:100%}
+  .sos-step-label{font-size:10px;letter-spacing:.26em;color:#6f8fb0;text-transform:uppercase;margin-bottom:18px}
+  .sos-h{font-size:25px;line-height:1.3;color:#e6eef7;margin:0 0 14px;font-weight:600}
+  .sos-p{font-size:15px;line-height:1.65;color:#9fb3c8;margin:0 0 30px}
+  .breath{width:150px;height:150px;border-radius:50%;margin:8px auto 26px;
+    background:radial-gradient(circle,rgba(91,141,217,.25),rgba(91,141,217,.05));
+    border:1.5px solid rgba(120,160,210,.5);display:grid;place-items:center;
+    color:#bcd2ea;font-size:14px;letter-spacing:.08em;
+    animation:breathe 11s ease-in-out infinite}
+  @keyframes breathe{
+    0%,100%{transform:scale(.78)}
+    18%{transform:scale(1.12)}      /* inhala 4s */
+    45%{transform:scale(1.12)}      /* sostiene */
+    82%{transform:scale(.78)}       /* exhala 6s */
+  }
+  .sos-btn{display:block;width:100%;border:none;border-radius:14px;padding:16px;font-size:15px;
+    font-weight:600;font-family:inherit;cursor:pointer;margin-top:11px;letter-spacing:.02em}
+  .sos-btn.main{background:#5b8dd9;color:#06080c}
+  .sos-btn.ghost{background:transparent;border:1px solid #2c3a4d;color:#8aa0b8}
+  .sos-btn.danger{background:transparent;border:1px solid #7a3b38;color:#d99a96}
+  .sos-timer{font-size:44px;color:#bcd2ea;font-variant-numeric:tabular-nums;margin:10px 0 4px;letter-spacing:.04em}
+  .sos-small{font-size:12px;color:#6f8fb0;margin-top:16px;line-height:1.5}
+  .sos-quote{font-size:13.5px;color:#8aa6c4;font-style:italic;line-height:1.6;
+    border-left:2px solid #3a5577;padding-left:14px;margin:22px 0;text-align:left}
+
+  /* panel módulo de vicios */
+  .vice-counter{text-align:center;padding:18px 0 22px}
+  .vc-num{font-size:64px;line-height:1;color:var(--gold);font-weight:600;letter-spacing:.02em}
+  .vc-lab{font-size:13px;color:var(--muted);margin-top:8px;letter-spacing:.04em}
+  .vice-clean{width:100%;border:none;border-radius:13px;padding:15px;font-size:15px;font-weight:600;
+    font-family:inherit;cursor:pointer;background:#4ca96b;color:#06120a;margin-bottom:11px}
+  .vice-today{text-align:center;font-size:13px;color:#8fbf9f;background:rgba(76,169,107,.1);
+    border:1px solid rgba(76,169,107,.3);border-radius:13px;padding:14px;margin-bottom:11px}
+  .vice-sos{width:100%;border:none;border-radius:13px;padding:15px;font-size:14px;font-weight:600;
+    font-family:inherit;cursor:pointer;background:rgba(91,141,217,.14);border:1px solid rgba(91,141,217,.5);
+    color:#9fc0ec;margin-bottom:22px}
+  .vice-sos:active{transform:scale(.99)}
+  .trigs{display:flex;flex-direction:column;gap:9px}
+  .trigrow{display:flex;align-items:center;gap:10px;font-size:12.5px}
+  .tg-n{flex:none;width:115px;color:#d2cab4}
+  .tg-bar{flex:1;height:7px;background:#161b22;border-radius:4px;overflow:hidden}
+  .tg-fill{display:block;height:100%;background:linear-gradient(90deg,#7a3b38,#c0473f);border-radius:4px}
+  .tg-c{flex:none;color:var(--muted);font-size:11px;width:18px;text-align:right}
+  .trig-note{font-size:11.5px;color:var(--muted);line-height:1.55;margin-top:11px}
+  .relapse-intro{font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+  .vice-relapse{width:100%;border:1px solid var(--line);border-radius:11px;padding:12px;font-size:13px;
+    font-family:inherit;cursor:pointer;background:transparent;color:var(--muted)}
+  .rlog{display:flex;flex-direction:column;gap:8px}
+  .rlog-it{font-size:12px;color:#b0a890;background:#0e1218;border:1px solid var(--line);
+    border-radius:9px;padding:9px 11px}
+  .rlog-it b{color:var(--ink)}
+  .rlog-note{font-size:11.5px;color:var(--muted);margin-top:4px;font-style:italic}
+
+  /* skills */
+  .sk-area{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--muted);margin:18px 0 10px}
+  .sk-dot{width:9px;height:9px;border-radius:50%}
+  .sk-card{display:flex;align-items:center;gap:12px;background:#0e1218;border:1px solid var(--line);
+    border-radius:12px;padding:12px;margin-bottom:9px;cursor:pointer;transition:.15s}
+  .sk-card:active{transform:scale(.99)}
+  .sk-card.locked{opacity:.5;cursor:default}
+  .sk-card.proven{border-color:rgba(127,206,194,.5)}
+  .sk-ico{flex:none;width:38px;height:38px;border-radius:10px;background:#151a22;display:grid;place-items:center;font-size:18px}
+  .sk-body{flex:1;min-width:0}
+  .sk-name{font-size:14px;font-weight:600;color:var(--ink)}
+  .sk-durable{font-size:11px;color:var(--muted);line-height:1.45;margin-top:3px}
+  .sk-badge{flex:none;font-size:9.5px;padding:4px 8px;border-radius:20px;white-space:nowrap;align-self:flex-start}
+  .sk-badge.lk{background:#1a1e26;color:#666}
+  .sk-badge.rd{background:rgba(127,206,194,.12);color:#7fcec2}
+  .sk-badge.ac{background:rgba(214,169,63,.14);color:#d6a93f}
+  .sk-badge.pr{background:rgba(127,206,194,.18);color:#9fded3}
+  .sk-start{font-size:13.5px;line-height:1.6;color:#d2cab4}
+  .sk-proof-intro{font-size:13px;color:#bfe0d8;background:rgba(127,206,194,.07);border:1px solid rgba(127,206,194,.25);
+    border-radius:10px;padding:11px 13px;line-height:1.5;margin-bottom:11px}
+  .sk-proof-btn{width:100%;border:1px solid var(--bcol);background:transparent;color:var(--bcol);
+    border-radius:10px;padding:11px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;margin-top:9px}
+  .sk-proof-btn:active{transform:scale(.99)}
+  .sk-proofs{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+  .sk-proof-it{background:#0e1218;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .sk-proof-it b{font-size:11px;color:var(--bcol)}
+  .sk-proof-tx{font-size:13px;color:#d2cab4;margin-top:5px;line-height:1.5;word-break:break-word}
+
+  /* nodo en ruta activa */
+  .node.onpath .glyph{box-shadow:0 0 0 2px var(--gold),0 0 16px -1px var(--gold)}
+  .node.onpath .lbl{color:var(--gold)}
+
+  /* check honesto */
+  #checkScrim{position:fixed;inset:0;background:rgba(4,5,8,.78);backdrop-filter:blur(4px);
+    z-index:60;opacity:0;pointer-events:none;transition:opacity .25s}
+  #checkScrim.on{opacity:1;pointer-events:auto}
+  #checkBox{position:fixed;left:50%;top:50%;transform:translate(-50%,-46%) scale(.96);
+    width:min(440px,92vw);max-height:86vh;z-index:65;background:linear-gradient(180deg,#12161e,#0b0e13);
+    border:1px solid #2a2f38;border-radius:18px;display:flex;flex-direction:column;
+    opacity:0;pointer-events:none;transition:opacity .28s,transform .28s;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+  #checkBox.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+  .ck-head{padding:20px 22px 14px;border-bottom:1px solid var(--line)}
+  .ck-eyebrow{font-size:9.5px;letter-spacing:.24em;color:var(--gold)}
+  .ck-title{font-size:20px;margin:8px 0 6px;letter-spacing:.01em}
+  .ck-sub{font-size:12px;color:var(--muted);line-height:1.55}
+  .ck-body{padding:16px 22px;overflow-y:auto}
+  .ckq{margin-bottom:18px}
+  .ckq-q{font-size:13.5px;color:#d2cab4;margin-bottom:9px;line-height:1.45}
+  .ckq-opts{display:flex;flex-direction:column;gap:7px}
+  .ckopt{font-size:13px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;
+    background:#0e1218;color:var(--ink);cursor:pointer;transition:.15s;text-align:left}
+  .ckopt:active{transform:scale(.99)}
+  .ckopt.sel{border-color:var(--gold);background:rgba(201,168,74,.1)}
+  .cktext{width:100%;background:#0e1218;border:1px solid var(--line);border-radius:10px;
+    color:var(--ink);padding:11px;font-family:inherit;font-size:13px;resize:vertical;min-height:54px}
+  .ck-foot{padding:14px 22px 18px;border-top:1px solid var(--line);display:flex;gap:10px}
+  .ckbtn{flex:1;border:none;border-radius:11px;padding:13px;font-size:14px;font-weight:600;
+    cursor:pointer;font-family:inherit}
+  .ckbtn.go{background:var(--gold);color:#0a0c10}
+  .ckbtn.cancel{background:transparent;border:1px solid var(--locked);color:var(--muted)}
+  .ck-verdict{font-size:13px;line-height:1.6;padding:14px;border-radius:11px;margin-top:4px}
+  .ck-verdict.pass{background:rgba(76,169,107,.1);border:1px solid rgba(76,169,107,.35);color:#a9d8bb}
+  .ck-verdict.fail{background:rgba(192,71,63,.1);border:1px solid rgba(192,71,63,.35);color:#e0a09a}
+
+  /* constancia / práctica */
+  .prac-card{background:#0e1218;border:1px solid var(--line);border-radius:13px;padding:14px}
+  .prac-top{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.04em;color:var(--muted);margin-bottom:8px}
+  .prac-top span:first-child{color:var(--gold);letter-spacing:.16em;text-transform:uppercase;font-size:10px}
+  .prac-bar{height:8px;background:#161b22;border-radius:5px;overflow:hidden}
+  .prac-fill{height:100%;background:linear-gradient(90deg,var(--gold-soft),var(--gold));border-radius:5px;transition:width .5s}
+  .prac-note{font-size:11.5px;color:var(--muted);line-height:1.55;margin-top:10px}
+  .prac-warn{font-size:12px;color:#e0a09a;background:rgba(192,71,63,.09);border:1px solid rgba(192,71,63,.3);
+    border-radius:9px;padding:9px 11px;margin-top:11px;line-height:1.5}
+  .prac-warn b{color:#eebab4}
+
+  /* estado practicing del nodo en el árbol */
+  .node.practicing .glyph{border-color:var(--bcol);border-style:dashed;
+    box-shadow:0 0 12px -3px var(--bcol)}
+  .node.practicing .glyph .ring{border-color:var(--bcol);opacity:.4;animation:pulse 2.4s ease-in-out infinite}
+  .node.practicing .lbl{color:var(--ink)}
+  .node.practicing .pdot{position:absolute;left:-3px;bottom:-3px;width:16px;height:16px;border-radius:50%;
+    background:var(--bcol);color:#0a0c10;display:grid;place-items:center;font-size:10px;font-weight:bold}
+  .pdot{display:none}
+</style>
+
+<div id="hud">
+  <div class="brand">SENDA<small>el árbol del hombre completo</small></div>
+  <div class="lvlbox">
+    <div class="lvlnum">NIVEL <b id="lvl">1</b></div>
+    <div class="xpbar"><div class="xpfill" id="xpfill"></div></div>
+    <div class="xpsub ui-font" id="xpsub">0 / 3 nodos</div>
+  </div>
+</div>
+
+<div id="stage">
+  <div id="world">
+    <svg class="lines" id="lines"></svg>
+  </div>
+</div>
+
+<div id="legend"></div>
+
+<div id="fab">
+  <div class="fbtn" id="skills" style="color:#7fcec2">⚒</div>
+  <div class="fbtn" id="vice" style="color:#d6a93f">🛡</div>
+  <div class="fbtn" id="summary">📊</div>
+  <div class="fbtn" id="zin">+</div>
+  <div class="fbtn" id="zout">−</div>
+  <div class="fbtn" id="recenter">⌖</div>
+</div>
+
+<div class="hint" id="hint">Arrastra para moverte · pellizca para zoom</div>
+<div class="toast" id="toast"></div>
+
+<div id="scrim"></div>
+<div id="sheet">
+  <div class="grip"></div>
+  <div class="shead">
+    <div class="eyebrow" id="sEyebrow">RAMA</div>
+    <div class="stitle" id="sTitle">Título</div>
+    <div class="smeta" id="sMeta"></div>
+  </div>
+  <div class="sbody" id="sBody"></div>
+  <div class="sfoot" id="sFoot"></div>
+</div>
+
+<div id="checkScrim"></div>
+<div id="checkBox">
+  <div class="ck-head">
+    <div class="ck-eyebrow">CHEQUEO DE HONESTIDAD</div>
+    <div class="ck-title" id="ckTitle">¿De verdad lo dominas?</div>
+    <div class="ck-sub" id="ckSub">Responde con sinceridad. Esto es solo para ti — nadie más lo ve. Mentirte aquí solo te roba a ti mismo.</div>
+  </div>
+  <div class="ck-body" id="ckBody"></div>
+  <div class="ck-foot" id="ckFoot"></div>
+</div>
+
+<div id="sos">
+  <div class="sos-inner" id="sosInner"></div>
+</div>
+
+<div id="intro">
+  <div>
+    <h1>SENDA</h1>
+    <p>No es para volverte mejor que los demás. Es para volverte mejor que tú de ayer — la única medida que no te traiciona. Diez ramas del hombre completo: mente, poder, cuerpo, dinero, alma, vínculo, eros, espíritu, oficio y lenguas. Aquí nada se marca con un clic vacío: cada paso pide constancia real, dice <em>por qué</em> se hace y qué dice <em>la ciencia</em>.</p>
+    <button class="go" id="introGo">Comenzar la senda</button>
+  </div>
+</div>
+
+<script>
+/* SENDA v2 — datos del árbol (10 ramas, tercer nivel, evidencia) */
+const BRANCHES = {
+  core:   {name:"El Núcleo",   css:"#c9a84a"},
+  mente:  {name:"Mente",       css:"#5b8dd9"},
+  poder:  {name:"Poder",       css:"#c0473f"},
+  cuerpo: {name:"Cuerpo",      css:"#4ca96b"},
+  dinero: {name:"Dinero",      css:"#3fa3a3"},
+  alma:   {name:"Alma",        css:"#9b6bd6"},
+  social: {name:"Vínculo",     css:"#d98a3f"},
+  eros:   {name:"Eros",        css:"#d65a8a"},
+  espiritu:{name:"Espíritu",   css:"#caa86a"},
+  oficio: {name:"Oficio",      css:"#7a8c5a"},
+  lengua: {name:"Lenguas",     css:"#5ab0a8"},
+};
+const NODES = [
+{
+"id": "core",
+"branch": "core",
+"tier": 0,
+"x": 0,
+"y": 0,
+"icon": "✦",
+"title": "Tú, ahora",
+"time": "El punto de partida",
+"why": "Todo árbol nace de una raíz. Antes de crecer en cualquier dirección necesitas un punto fijo: saber dónde estás hoy, sin mentirte. La honestidad contigo mismo es la única base sobre la que se construye algo real. Nadie nació siendo el mejor; eligieron una dirección y avanzaron con constancia.",
+"evidence": "La psicología del cambio de conducta (modelo transteórico de Prochaska y DiClemente) muestra que el cambio sostenible empieza por una fase de contemplación honesta del estado actual, no por la acción impulsiva.",
+"tips": [
+"Escribe tu situación real: salud, dinero, relaciones, mente. Sin adornos.",
+"No desbloquees todo a la vez. Elige una rama y profundiza.",
+"La constancia vence a la intensidad. Esto se mide en años."
+],
+"paradigms": [
+"'Tengo que arreglarlo todo ya' → El cambio real es acumulativo, no explosivo.",
+"'Otros tienen un talento que yo no' → El talento es constancia disfrazada."
+],
+"steps": [
+"Define tu 'por qué' principal: ¿para qué quieres ser tu máxima versión?",
+"Elige UNA rama para empezar este mes.",
+"Marca este nodo y comienza."
+],
+"habits": [
+"Revisar mi progreso 1 vez por semana"
+],
+"links": [
+{
+"t": "Modelo transteórico del cambio",
+"u": "https://es.wikipedia.org/wiki/Modelo_transte%C3%B3rico"
+}
+]
+},
+{
+"id": "mente",
+"branch": "mente",
+"tier": 1,
+"x": 0,
+"y": -235,
+"icon": "☉",
+"need": [
+"core"
+],
+"title": "Mente",
+"time": "Dominio de por vida",
+"why": "Tu mente es el sistema operativo desde el que opera todo lo demás. Cuerpo fuerte o cuenta llena valen poco con una mente caótica y reactiva. Esta rama te enseña a pensar con claridad, gestionar emociones y entender a las personas. Es lo que más se nota en quien 'lo sabe todo y no se estresa'.",
+"evidence": "La neuroplasticidad —la capacidad del cerebro de reorganizarse con la experiencia— está bien documentada: el carácter y los hábitos mentales son entrenables a cualquier edad, no fijos.",
+"tips": [
+"Una mente entrenada no reacciona, responde.",
+"Lee menos noticias y más principios atemporales."
+],
+"paradigms": [
+"'Soy así por naturaleza' → El carácter se entrena como un músculo."
+],
+"steps": [
+"Recorre los nodos de esta rama en orden de profundidad.",
+"Aplica un concepto a la semana en la vida real."
+],
+"habits": [
+"10 min de lectura reflexiva al día"
+],
+"links": []
+},
+{
+"id": "foco",
+"branch": "mente",
+"tier": 2,
+"x": 31,
+"y": -444,
+"icon": "◎",
+"need": [
+"mente"
+],
+"title": "Foco profundo",
+"time": "4–8 semanas para notar cambios",
+"why": "La concentración profunda es, en la era de la distracción, una superpotencia rara. Quien trabaja 90 minutos sin tocar el teléfono produce más en una mañana que otros en un día. El foco multiplica todo lo demás que aprendas en este árbol.",
+"evidence": "Estudios sobre la fuga de atención (Gloria Mark, UC Irvine) muestran que tras una interrupción se tarda en promedio ~23 minutos en recuperar la concentración plena. La multitarea reduce el rendimiento medible.",
+"tips": [
+"Trabaja en bloques de 50–90 min con descansos reales.",
+"El teléfono en otra habitación, no boca abajo en la mesa.",
+"Aburrirte es entrenamiento: no lo calmes con scroll."
+],
+"paradigms": [
+"'Soy bueno en multitarea' → No existe; es cambio de tarea con coste.",
+"'Necesito estar disponible siempre' → La disponibilidad constante es esclavitud voluntaria."
+],
+"steps": [
+"Elige una tarea importante y ponle 50 min de cronómetro.",
+"Cero interrupciones en ese bloque.",
+"Anota cuántos bloques limpios logras al día y súbelos."
+],
+"habits": [
+"1 bloque de foco profundo sin teléfono",
+"Dejar el móvil fuera del cuarto al dormir"
+],
+"links": [
+{
+"t": "Deep Work — resumen",
+"u": "https://fs.blog/deep-work/"
+}
+]
+},
+{
+"id": "aprender",
+"branch": "mente",
+"tier": 2,
+"x": -62,
+"y": -390,
+"icon": "❖",
+"need": [
+"foco"
+],
+"title": "Aprender a aprender",
+"time": "3–5 semanas para dominar el método",
+"why": "La habilidad maestra: si aprendes rápido cualquier cosa, ninguna rama te queda lejos. Los que 'saben muchas cosas' no son más inteligentes: tienen mejor método de adquisición. Lo aprendes una vez y lo aplicas mil veces.",
+"evidence": "El meta-análisis de Dunlosky et al. (2013) y la replicación de Donoghue & Hattie (2021, 242 estudios, +169.000 personas) confirman que el recuerdo activo y la práctica distribuida son las técnicas MÁS eficaces. Releer y subrayar —las más usadas— están entre las menos eficaces.",
+"study": {"t": "Dunlosky et al. 2013 (técnicas de estudio)", "u": "https://pubmed.ncbi.nlm.nih.gov/26173288/"},
+"tips": [
+"Enseña lo que aprendes (técnica Feynman): si no lo explicas simple, no lo entendiste.",
+"Recordar activamente (cerrar el libro y escribir) supera a releer.",
+"Repaso espaciado: revisa a intervalos crecientes."
+],
+"paradigms": [
+"'Releer es estudiar' → Da ilusión de saber; el recuerdo activo es lo que funciona.",
+"'O naces inteligente o no' → La inteligencia se cultiva con método."
+],
+"steps": [
+"Cierra el material y escribe todo lo que recuerdes (recuerdo activo).",
+"Usa repaso espaciado (Anki): primer repaso ~3-6 días después.",
+"Explica cada tema en voz alta como si enseñaras a un niño."
+],
+"habits": [
+"Recuerdo activo de algo aprendido hoy",
+"Sesión de repaso espaciado"
+],
+"links": [
+{
+"t": "Técnica Feynman",
+"u": "https://fs.blog/feynman-technique/"
+},
+{
+"t": "Meta-análisis de técnicas de estudio",
+"u": "https://pubmed.ncbi.nlm.nih.gov/26173288/"
+}
+]
+},
+{
+"id": "estoicismo",
+"branch": "mente",
+"tier": 2,
+"x": 115,
+"y": -378,
+"icon": "⊙",
+"need": [
+"mente"
+],
+"title": "Estoicismo aplicado",
+"time": "Lectura 2–3 semanas, práctica de por vida",
+"why": "El estoicismo es el manual de la calma. Separa lo que depende de ti de lo que no, y gasta energía solo en lo primero. Por eso quien lo practica parece imperturbable: no es que no sienta, es que no malgasta su paz en lo que no controla.",
+"evidence": "La Terapia Cognitivo-Conductual (TCC), uno de los tratamientos psicológicos con más respaldo empírico, deriva directamente del principio estoico de que nos perturban nuestros juicios sobre los hechos, no los hechos en sí (Epicteto).",
+"study": {"t": "Raíces estoicas de la TCC (Robertson)", "u": "https://pubmed.ncbi.nlm.nih.gov/20141661/"},
+"tips": [
+"Cada mañana: ¿qué depende de mí hoy y qué no?",
+"Premeditación de males: imagina lo peor para quitarle poder.",
+"Reto: no quejarte durante 24h. Verás cuánto te quejabas."
+],
+"paradigms": [
+"'Las cosas me estresan' → No las cosas, sino tu juicio sobre ellas.",
+"'Necesito que todo salga como quiero' → Quiere lo que controlas; acepta lo demás."
+],
+"steps": [
+"Lee a Epicteto (Enquiridión): corto y directo.",
+"Aplica la dicotomía del control a un problema actual.",
+"Diario nocturno de 3 líneas: qué hice bien, mal y mejoraré."
+],
+"habits": [
+"Diario estoico nocturno (3 líneas)",
+"Dicotomía del control al despertar"
+],
+"links": [
+{
+"t": "Enquiridión de Epicteto",
+"u": "https://es.wikisource.org/wiki/Enquiridi%C3%B3n"
+},
+{
+"t": "Daily Stoic",
+"u": "https://dailystoic.com/"
+}
+]
+},
+{
+"id": "psico-normal",
+"branch": "mente",
+"tier": 2,
+"x": -143,
+"y": -416,
+"icon": "☯",
+"need": [
+"aprender"
+],
+"title": "Psicología humana",
+"time": "2–4 meses de estudio",
+"why": "Entender por qué la gente hace lo que hace te da ventaja en cada interacción: negociar, liderar, amar, vender. No para manipular, sino para no ser manipulado y conectar de verdad. Quien lee a la gente parece adivino; solo aprendió los patrones.",
+"evidence": "La existencia de sesgos cognitivos sistemáticos (Kahneman y Tversky, premio Nobel) demuestra que el comportamiento humano es predecible: erramos de formas regulares y estudiadas.",
+"study": {"t": "Tversky & Kahneman 1974 — heurísticos y sesgos", "u": "https://pubmed.ncbi.nlm.nih.gov/17835457/"},
+"tips": [
+"Observa más de lo que hablas en grupos.",
+"Casi todo comportamiento cubre una necesidad: seguridad, estatus o pertenencia.",
+"La gente recuerda cómo la hiciste sentir, no lo que dijiste."
+],
+"paradigms": [
+"'La gente es impredecible' → Es muy predecible si entiendes sus incentivos.",
+"'Las emociones estorban a la razón' → Son datos; ignorarlas pierde información."
+],
+"steps": [
+"Estudia los sesgos clave: anclaje, confirmación, prueba social.",
+"Aprende a nombrar emociones con precisión (rueda de emociones).",
+"Practica escucha activa: repite lo que oíste antes de responder."
+],
+"habits": [
+"Nombrar una emoción propia con precisión al día"
+],
+"links": [
+{
+"t": "Lista de sesgos cognitivos",
+"u": "https://es.wikipedia.org/wiki/Sesgo_cognitivo"
+}
+]
+},
+{
+"id": "psico-oscura",
+"branch": "mente",
+"tier": 2,
+"x": 162,
+"y": -446,
+"icon": "☾",
+"need": [
+"psico-normal",
+"estoicismo"
+],
+"title": "Psicología oscura (defensa)",
+"time": "Estudio continuo",
+"why": "El mundo tiene manipuladores, narcisistas y depredadores sociales. Conocer sus tácticas —gaslighting, bombardeo de amor, triangulación, culpabilización— no es para usarlas, sino para detectarlas y ser inmune. Un hombre completo no es ingenuo: ve el juego antes de que lo jueguen.",
+"evidence": "La tríada oscura (narcisismo, maquiavelismo, psicopatía) es un constructo validado en psicología de la personalidad (Paulhus & Williams, 2002), con escalas medibles y correlatos conductuales replicados.",
+"study": {"t": "Paulhus & Williams 2002 — Tríada Oscura", "u": "https://doi.org/10.1016/S0092-6566(02)00505-6"},
+"tips": [
+"Si una relación te confunde sobre tu propia realidad, sospecha gaslighting.",
+"La urgencia artificial ('decide ya') casi siempre es manipulación.",
+"Quien te aísla de tus seres queridos te está controlando."
+],
+"paradigms": [
+"'Pensar mal es ser mala persona' → Reconocer el mal te protege de él.",
+"'Yo nunca caería en eso' → Todos somos manipulables sin conocer las tácticas."
+],
+"steps": [
+"Estudia la tríada oscura y sus señales.",
+"Aprende a identificar banderas rojas tempranas.",
+"Practica 'lo voy a pensar' ante cualquier presión inmediata."
+],
+"habits": [
+"Pausar 24h antes de decisiones bajo presión"
+],
+"links": [
+{
+"t": "Tríada oscura",
+"u": "https://es.wikipedia.org/wiki/Tr%C3%ADada_oscura"
+}
+]
+},
+{
+"id": "pensamiento-critico",
+"branch": "mente",
+"tier": 3,
+"x": -40,
+"y": -574,
+"icon": "⊻",
+"need": [
+"psico-normal"
+],
+"title": "Pensamiento crítico y lógica",
+"time": "2–3 meses",
+"why": "En un mundo de desinformación, distinguir un argumento sólido de uno falaz es defensa intelectual. El pensamiento crítico te hace difícil de engañar y bueno para decidir. Es la base de no creer todo lo que lees ni todo lo que sientes.",
+"evidence": "La probabilidad bayesiana ofrece un marco normativo para actualizar creencias con evidencia. Entrenar el reconocimiento de falacias mejora la calidad del juicio de forma transferible.",
+"tips": [
+"Pregunta siempre: ¿qué evidencia cambiaría mi opinión?",
+"Aprende las falacias comunes: hombre de paja, falso dilema, ad hominem.",
+"Distingue correlación de causalidad antes de concluir."
+],
+"paradigms": [
+"'Si lo siento fuerte, es verdad' → La intensidad de una creencia no mide su veracidad.",
+"'Buscar información es ser objetivo' → Solemos buscar lo que confirma lo que ya creíamos."
+],
+"steps": [
+"Aprende a identificar 10 falacias lógicas comunes.",
+"Practica el razonamiento bayesiano: pondera probabilidades, no certezas.",
+"Antes de opinar, busca el mejor argumento contrario."
+],
+"habits": [
+"Cuestionar una creencia propia hoy"
+],
+"links": [
+{
+"t": "Falacias lógicas",
+"u": "https://es.wikipedia.org/wiki/Falacia"
+},
+{
+"t": "Teorema de Bayes (intuitivo)",
+"u": "https://es.wikipedia.org/wiki/Teorema_de_Bayes"
+}
+]
+},
+{
+"id": "memoria",
+"branch": "mente",
+"tier": 3,
+"x": -123,
+"y": -531,
+"icon": "⌬",
+"need": [
+"aprender"
+],
+"title": "Memoria de élite",
+"time": "4–8 semanas",
+"why": "Una memoria entrenada te permite recordar nombres, datos, discursos y conocimiento sin depender del teléfono. No es don: los campeones de memoria usan técnicas que cualquiera aprende. Recordar bien hace que parezcas brillante y presente.",
+"evidence": "Estudios de neuroimagen sobre campeones de memoria (Maguire et al.) muestran que NO tienen cerebros distintos: usan el método de loci (palacio de la memoria), una técnica de +2.000 años, entrenable por cualquiera.",
+"study": {"t": "Maguire et al. — cerebros de campeones de memoria", "u": "https://pubmed.ncbi.nlm.nih.gov/12819785/"},
+"tips": [
+"Palacio de la memoria: asocia datos a lugares que conoces.",
+"Convierte números en imágenes; el cerebro recuerda imágenes, no cifras.",
+"Asociaciones absurdas y vívidas se fijan mejor que las lógicas."
+],
+"paradigms": [
+"'Tengo mala memoria' → Tienes memoria sin entrenar, que es distinto.",
+"'Memorizar es de loros' → Memorizar libera la mente para pensar, no la limita."
+],
+"steps": [
+"Aprende y construye tu primer palacio de la memoria.",
+"Practica recordar una lista de 10 cosas con loci.",
+"Aplica imágenes a nombres de personas que conozcas."
+],
+"habits": [
+"Memorizar algo con técnica de loci"
+],
+"links": [
+{
+"t": "Palacio de la memoria",
+"u": "https://es.wikipedia.org/wiki/Palacio_de_la_memoria"
+}
+]
+},
+{
+"id": "poder",
+"branch": "poder",
+"tier": 1,
+"x": 138,
+"y": -190,
+"icon": "♔",
+"need": [
+"core"
+],
+"title": "Poder e influencia",
+"time": "Dominio de por vida",
+"why": "El poder no es maldad: es la capacidad de hacer que las cosas sucedan y de no ser pisoteado. Ignorarlo no te hace virtuoso, te hace vulnerable a quien sí lo entiende. Esta rama te enseña las dinámicas de estatus, influencia y liderazgo para moverte con dignidad y fuerza.",
+"evidence": "La investigación de Cialdini sobre persuasión identifica 6-7 principios universales (reciprocidad, compromiso, prueba social, autoridad, simpatía, escasez, unidad) replicados en cientos de experimentos.",
+"tips": [
+"El poder se demuestra, rara vez se anuncia.",
+"Quien controla sus reacciones controla la sala."
+],
+"paradigms": [
+"'El poder corrompe siempre' → El poder revela; con carácter, eleva."
+],
+"steps": [
+"Estudia las dinámicas, aplica con ética.",
+"Observa a los líderes que admiras: copia patrones, no personas."
+],
+"habits": [
+"Observar las dinámicas de poder en una interacción"
+],
+"links": []
+},
+{
+"id": "leyes-poder",
+"branch": "poder",
+"tier": 2,
+"x": 297,
+"y": -268,
+"icon": "⚔",
+"need": [
+"poder"
+],
+"title": "Las leyes del poder",
+"time": "Lectura 1–2 meses",
+"why": "Las 48 Leyes del Poder describen, te gusten o no, cómo funcionan las dinámicas de influencia que existen desde siempre. Leerlas no es volverte maquiavélico; es dejar de ser ingenuo. Usas las que encajan con tu ética y reconoces cuándo las usan contra ti.",
+"evidence": "Muchas de estas 'leyes' coinciden con hallazgos de la psicología social del estatus y la teoría de juegos sobre cooperación, señalización y reputación.",
+"tips": [
+"Nunca eclipses al jefe; hazlo quedar bien y subirás con él.",
+"Habla menos de lo necesario; el silencio incomoda y revela.",
+"Tu reputación es tu escudo; protégela como un activo."
+],
+"paradigms": [
+"'Si soy bueno, me reconocerán solo' → El mérito sin visibilidad rara vez gana.",
+"'La honestidad total siempre conviene' → La discreción no es mentira; es estrategia."
+],
+"steps": [
+"Lee las leyes y marca cuáles ya viste contra ti.",
+"Elige 3 que encajen con tus valores y practícalas.",
+"Identifica quién juega cada ley en tu entorno."
+],
+"habits": [
+"Pensar antes de revelar mis planes"
+],
+"links": [
+{
+"t": "Las 48 leyes (resumen)",
+"u": "https://www.shortform.com/blog/48-laws-of-power/"
+}
+]
+},
+{
+"id": "carisma",
+"branch": "poder",
+"tier": 2,
+"x": 210,
+"y": -364,
+"icon": "✺",
+"need": [
+"poder"
+],
+"title": "Carisma y presencia",
+"time": "2–4 meses de práctica",
+"why": "El carisma no es genético: es presencia, calidez y poder combinados, y se entrena. La gente carismática hace sentir importante al otro y proyecta seguridad sin arrogancia. Es lo que hace que entres a un lugar y la energía cambie.",
+"evidence": "Investigación de Olivia Fox Cabane y estudios de comportamiento no verbal muestran que el carisma se descompone en conductas medibles y entrenables: presencia, poder y calidez, no un rasgo innato.",
+"tips": [
+"Presencia: estar 100% donde estás, sin mirar el móvil al escuchar.",
+"Calidez: sonríe con los ojos, recuerda nombres, pregunta.",
+"Poder: postura erguida, voz pausada, no llenes los silencios."
+],
+"paradigms": [
+"'El carisma se tiene o no' → Es un conjunto de conductas aprendibles.",
+"'Hablar mucho es carisma' → Escuchar bien magnetiza más que hablar."
+],
+"steps": [
+"Practica contacto visual sostenido y cómodo.",
+"Baja el ritmo de tu voz un 20%.",
+"Haz que el otro hable más que tú en cada conversación."
+],
+"habits": [
+"Postura erguida al entrar a un lugar",
+"Recordar y usar el nombre de alguien nuevo"
+],
+"links": [
+{
+"t": "El mito del carisma",
+"u": "https://www.scienceofpeople.com/charisma/"
+}
+]
+},
+{
+"id": "oratoria",
+"branch": "poder",
+"tier": 2,
+"x": 396,
+"y": -396,
+"icon": "❡",
+"need": [
+"carisma",
+"leyes-poder"
+],
+"title": "Oratoria y persuasión",
+"time": "3–6 meses",
+"why": "Saber hablar en público y persuadir multiplica todo lo demás. Una buena idea mal comunicada pierde ante una idea mediocre bien expuesta. Quien domina la palabra mueve voluntades, lidera salas y nunca queda mudo cuando importa.",
+"evidence": "Los principios de persuasión de Cialdini están entre los hallazgos más replicados de la psicología social aplicada. La narrativa activa más regiones cerebrales que los datos aislados (estudios de neural coupling, Hasson).",
+"study": {"t": "Cialdini — principios de influencia", "u": "https://www.influenceatwork.com/principles-of-persuasion/"},
+"tips": [
+"Estructura: gancho → tensión → resolución.",
+"Las pausas son poder; quien no teme al silencio controla.",
+"Cuenta historias: el cerebro recuerda relatos, no datos sueltos."
+],
+"paradigms": [
+"'Hablar en público da miedo y ya' → El miedo se desactiva con repetición, no con talento.",
+"'Persuadir es engañar' → Persuadir es ayudar al otro a ver lo que tú ves."
+],
+"steps": [
+"Graba un video de 2 min explicando una idea y míralo.",
+"Únete a un grupo de práctica (Toastmasters).",
+"Aplica los principios de Cialdini: reciprocidad, prueba social, autoridad."
+],
+"habits": [
+"Grabarme explicando una idea 2 min"
+],
+"links": [
+{
+"t": "Principios de persuasión (Cialdini)",
+"u": "https://www.influenceatwork.com/principles-of-persuasion/"
+}
+]
+},
+{
+"id": "negociacion",
+"branch": "poder",
+"tier": 3,
+"x": 237,
+"y": -485,
+"icon": "⇄",
+"need": [
+"leyes-poder",
+"oratoria"
+],
+"title": "Negociación avanzada",
+"time": "3–6 meses",
+"why": "Toda la vida es negociación: salario, precios, acuerdos, conflictos. Quien negocia bien obtiene más sin pelear y deja al otro satisfecho. No es regatear: es entender intereses, crear valor y manejar la tensión sin ceder por miedo.",
+"evidence": "El método Harvard de negociación (Fisher & Ury, Getting to Yes) y las técnicas de Chris Voss (ex-FBI) sobre empatía táctica y preguntas calibradas tienen amplio respaldo en la práctica profesional.",
+"tips": [
+"Negocia intereses, no posiciones: pregunta '¿por qué quieres eso?'.",
+"El que primero menciona un número ancla la conversación.",
+"Empatía táctica: etiqueta la emoción del otro ('parece que te preocupa...')."
+],
+"paradigms": [
+"'Negociar es ganar yo y perder el otro' → Las mejores crean valor para ambos.",
+"'Hay que ser duro' → La firmeza con calidez supera a la agresividad."
+],
+"steps": [
+"Antes de negociar, define tu BATNA (mejor alternativa si no hay acuerdo).",
+"Practica preguntas calibradas ('¿cómo se supone que haga eso?').",
+"Usa el silencio tras tu oferta; deja que el otro lo llene."
+],
+"habits": [
+"Negociar conscientemente una situación del día"
+],
+"links": [
+{
+"t": "Getting to Yes (método Harvard)",
+"u": "https://www.pon.harvard.edu/tag/getting-to-yes/"
+}
+]
+},
+{
+"id": "cuerpo",
+"branch": "cuerpo",
+"tier": 1,
+"x": 138,
+"y": 190,
+"icon": "❦",
+"need": [
+"core"
+],
+"title": "Cuerpo y disciplina",
+"time": "Dominio de por vida",
+"why": "El cuerpo es el vehículo de todo lo demás. Energía, confianza, claridad mental y longevidad nacen aquí. La disciplina física es la más visible y honesta: el cuerpo no miente sobre tus hábitos. Forjarlo forja el carácter.",
+"evidence": "La actividad física regular reduce el riesgo de mortalidad por todas las causas, enfermedad cardiovascular, diabetes y depresión, según consenso de la OMS y miles de estudios.",
+"tips": [
+"La disciplina del cuerpo se contagia a toda tu vida.",
+"No buscas perfección estética, sino capacidad y salud."
+],
+"paradigms": [
+"'No tengo tiempo de entrenar' → No tienes tiempo de estar enfermo y débil."
+],
+"steps": [
+"Empieza por lo no negociable: sueño, comida, movimiento.",
+"Construye un hábito antes de añadir el siguiente."
+],
+"habits": [
+"Moverme al menos 30 min hoy"
+],
+"links": []
+},
+{
+"id": "fuerza",
+"branch": "cuerpo",
+"tier": 2,
+"x": 156,
+"y": 368,
+"icon": "⊿",
+"need": [
+"cuerpo"
+],
+"title": "Fuerza y entrenamiento",
+"time": "Resultados visibles 8–12 semanas",
+"why": "Levantar peso no es solo estética: construye huesos densos, articulaciones fuertes, mejor postura y un cerebro que produce más confianza. La fuerza se traduce en presencia y en una vejez autónoma. Es de las mejores inversiones que existen.",
+"evidence": "Meta-análisis (Am J Prev Med, 2022): el entrenamiento de fuerza se asocia a ~15% menos mortalidad por todas las causas, con beneficio máximo (~27%) en torno a 30–60 minutos por semana. También previene sarcopenia y caídas en la vejez.",
+"study": {"t": "Meta-análisis fuerza y mortalidad 2022 (PubMed)", "u": "https://pubmed.ncbi.nlm.nih.gov/35599175/"},
+"tips": [
+"Prioriza los básicos: sentadilla, peso muerto, empuje, tracción.",
+"Progresión sobre perfección: añade peso o repeticiones poco a poco.",
+"La técnica primero; el ego deja lesiones."
+],
+"paradigms": [
+"'Las pesas te dejan enorme y rígido' → La hipertrofia extrema exige años y dieta brutal.",
+"'Cardio basta' → Sin fuerza pierdes músculo y autonomía con la edad."
+],
+"steps": [
+"Aprende la técnica de los 5 movimientos básicos.",
+"Entrena fuerza 2–3 veces/semana, cuerpo completo (30–60 min basta).",
+"Registra tus pesos para garantizar progresión."
+],
+"habits": [
+"Entrenamiento de fuerza (día programado)",
+"Registrar mis cargas de hoy"
+],
+"links": [
+{
+"t": "Guía de fuerza para principiantes",
+"u": "https://www.strongerbyscience.com/complete-strength-training-guide/"
+},
+{
+"t": "Fuerza y mortalidad (meta-análisis)",
+"u": "https://pubmed.ncbi.nlm.nih.gov/35599175/"
+}
+]
+},
+{
+"id": "nutricion",
+"branch": "cuerpo",
+"tier": 2,
+"x": 253,
+"y": 335,
+"icon": "❂",
+"need": [
+"cuerpo"
+],
+"title": "Nutrición inteligente",
+"time": "4–6 semanas para ajustar hábitos",
+"why": "Comes 3–5 veces al día; ninguna decisión repetida tantas veces da igual. La comida define tu energía, tu humor y tu salud a largo plazo. No se trata de dietas extremas, sino de principios simples sostenibles toda la vida.",
+"evidence": "Las revisiones sobre patrones alimentarios (dieta mediterránea, estudio PREDIMED) muestran reducción de eventos cardiovasculares. La proteína adecuada (~1.6 g/kg) optimiza la síntesis muscular según meta-análisis (Morton et al.).",
+"study": {"t": "Morton et al. — proteína y músculo (meta-análisis)", "u": "https://pubmed.ncbi.nlm.nih.gov/28698222/"},
+"tips": [
+"Come comida real: si tu bisabuela no lo reconocería, piénsalo.",
+"Proteína suficiente en cada comida sostiene músculo y saciedad.",
+"Regla 80/20: come bien la mayoría del tiempo, disfruta el resto sin culpa."
+],
+"paradigms": [
+"'Necesito una dieta de moda' → Los básicos sostenibles ganan a cualquier extremo.",
+"'Comer sano es caro' → Huevos, legumbres, avena y verduras son baratos."
+],
+"steps": [
+"Calcula tus necesidades aproximadas de proteína y calorías.",
+"Medio plato verduras, un cuarto proteína, un cuarto carbohidrato.",
+"Bebe agua antes de cada comida."
+],
+"habits": [
+"Proteína en cada comida principal",
+"Beber suficiente agua hoy"
+],
+"links": [
+{
+"t": "Bases de nutrición",
+"u": "https://www.precisionnutrition.com/nutrition-guide"
+}
+]
+},
+{
+"id": "sueno",
+"branch": "cuerpo",
+"tier": 2,
+"x": 302,
+"y": 262,
+"icon": "☽",
+"need": [
+"fuerza",
+"nutricion"
+],
+"title": "Sueño y recuperación",
+"time": "2–3 semanas para reajustar",
+"why": "El sueño sostiene a todos los demás pilares: sin él, la mente se nubla, el cuerpo no se recupera y las emociones se descontrolan. Dormir bien no es pereza, es la inversión más rentable en tu rendimiento. Los que 'no se estresan' casi siempre duermen bien.",
+"evidence": "La privación de sueño deteriora memoria, juicio, regulación emocional e inmunidad (Walker, Why We Sleep). Dormir <6h de forma crónica se asocia a mayor riesgo cardiometabólico en estudios epidemiológicos.",
+"study": {"t": "Privación de sueño y salud (revisión)", "u": "https://pubmed.ncbi.nlm.nih.gov/28579842/"},
+"tips": [
+"Misma hora de dormir y despertar, incluso fines de semana.",
+"Nada de pantallas 45 min antes de dormir.",
+"Cuarto oscuro, fresco y silencioso; sin móvil dentro."
+],
+"paradigms": [
+"'Dormir poco es de fuertes' → Es de imprudentes; arruina mente y cuerpo.",
+"'Recupero el sueño el finde' → La deuda de sueño no se paga así."
+],
+"steps": [
+"Fija hora de dormir y respétala 1 semana.",
+"Ritual de 30 min de desconexión antes de dormir.",
+"Saca el teléfono del dormitorio."
+],
+"habits": [
+"Dormir y despertar a hora fija",
+"Sin pantallas antes de dormir"
+],
+"links": [
+{
+"t": "Higiene del sueño",
+"u": "https://www.sleepfoundation.org/sleep-hygiene"
+}
+]
+},
+{
+"id": "cardio",
+"branch": "cuerpo",
+"tier": 3,
+"x": 254,
+"y": 499,
+"icon": "♥",
+"need": [
+"fuerza"
+],
+"title": "Resistencia y VO2 máx",
+"time": "8–12 semanas",
+"why": "La capacidad cardiovascular (VO2 máx) es uno de los predictores más fuertes de longevidad que existen. No se trata de correr maratones: combinar cardio suave abundante con algo de alta intensidad construye un motor que te mantiene joven por dentro.",
+"evidence": "Un VO2 máx alto se asocia a menor mortalidad de forma muy robusta (estudio en JAMA, 2018, +120.000 personas): la baja capacidad cardiorrespiratoria fue comparable a factores de riesgo como fumar o la diabetes.",
+"study": {"t": "Capacidad cardiorrespiratoria y mortalidad (JAMA 2018)", "u": "https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2707428"},
+"tips": [
+"Base aeróbica: mucho cardio fácil donde puedas conversar (Zona 2).",
+"Añade 1–2 sesiones cortas de alta intensidad por semana.",
+"Caminar mucho cada día es subestimado y poderosísimo."
+],
+"paradigms": [
+"'El cardio quema músculo' → En dosis sensatas mejora recuperación y salud.",
+"'Solo cuenta el ejercicio intenso' → El volumen de actividad suave es lo más protector."
+],
+"steps": [
+"Acumula caminatas diarias (apunta a moverte mucho).",
+"Añade 2–3 sesiones de cardio Zona 2 (30–45 min) por semana.",
+"Incluye 1 sesión de intervalos de alta intensidad."
+],
+"habits": [
+"Cardio Zona 2 hoy",
+"Alcanzar mis pasos diarios"
+],
+"links": [
+{
+"t": "VO2 máx y longevidad (JAMA)",
+"u": "https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2707428"
+}
+]
+},
+{
+"id": "movilidad",
+"branch": "cuerpo",
+"tier": 3,
+"x": 382,
+"y": 382,
+"icon": "⟆",
+"need": [
+"nutricion"
+],
+"title": "Movilidad y postura",
+"time": "4–8 semanas",
+"why": "La fuerza sin movilidad es una lesión esperando ocurrir. Una buena postura proyecta confianza y previene el dolor crónico de espalda y cuello que arruina la vida de tanta gente sedentaria. Moverte bien hoy es poder moverte a los 80.",
+"evidence": "La evidencia muestra que el movimiento regular y el fortalecimiento son más eficaces contra el dolor lumbar crónico que el reposo. La postura estática prolongada (no la 'mala postura' en sí) es el principal problema del sedentarismo.",
+"tips": [
+"La mejor postura es la siguiente postura: muévete a menudo.",
+"Trabaja la movilidad de cadera y columna torácica.",
+"Levántate y muévete cada 30–45 min si trabajas sentado."
+],
+"paradigms": [
+"'El estiramiento estático previene lesiones' → La evidencia es débil; la movilidad activa es mejor.",
+"'Tengo mala postura genética' → Casi siempre es debilidad y hábito, corregibles."
+],
+"steps": [
+"Añade 10 min de movilidad articular a tu rutina.",
+"Configura tu espacio de trabajo para no encorvarte.",
+"Pon recordatorios para levantarte y moverte."
+],
+"habits": [
+"10 min de movilidad",
+"Pausas activas cada hora trabajando"
+],
+"links": [
+{
+"t": "Dolor lumbar y movimiento",
+"u": "https://www.nhs.uk/conditions/back-pain/"
+}
+]
+},
+{
+"id": "dinero",
+"branch": "dinero",
+"tier": 1,
+"x": -138,
+"y": 190,
+"icon": "◈",
+"need": [
+"core"
+],
+"title": "Dinero y libertad",
+"time": "Dominio de por vida",
+"why": "El dinero no compra la felicidad, pero compra opciones, tiempo y tranquilidad. La ansiedad financiera arruina más vidas que casi cualquier otra cosa. Dominar tus finanzas es comprar tu libertad: poder decir 'no' y elegir cómo vives.",
+"evidence": "Estudios (Kahneman, Killingsworth) sugieren que el dinero reduce el sufrimiento y, hasta cierto punto, aumenta el bienestar. La seguridad financiera reduce el estrés crónico, que daña salud física y mental.",
+"tips": [
+"No importa cuánto ganas, sino cuánto conservas e inviertes.",
+"Libertad financiera = ingresos pasivos > gastos."
+],
+"paradigms": [
+"'El dinero es malo' → El dinero amplifica lo que ya eres."
+],
+"steps": [
+"Ordena tus números antes de soñar con invertir.",
+"Construye en capas: control → ahorro → inversión → ingresos."
+],
+"habits": [
+"Anotar mis gastos del día"
+],
+"links": []
+},
+{
+"id": "presupuesto",
+"branch": "dinero",
+"tier": 2,
+"x": -297,
+"y": 268,
+"icon": "▤",
+"need": [
+"dinero"
+],
+"title": "Control del gasto",
+"time": "1 mes para tomar el control",
+"why": "No puedes mejorar lo que no mides. La mayoría no sabe a dónde va su dinero, y por eso nunca sobra. Saber exactamente cuánto entra y sale es el primer acto de poder financiero; lo demás es imposible sin esto.",
+"evidence": "Investigación en finanzas conductuales muestra que automatizar el ahorro ('págate primero') supera a la fuerza de voluntad, porque elimina la decisión repetida y aprovecha la inercia.",
+"tips": [
+"Anota cada gasto durante 30 días, sin juzgarte.",
+"Regla 50/30/20: necesidades / deseos / ahorro e inversión.",
+"Págate primero: aparta el ahorro al cobrar, no lo que sobre."
+],
+"paradigms": [
+"'Presupuestar es restrictivo' → Es darte permiso de gastar sin culpa.",
+"'Cuando gane más ahorraré' → Sin hábito, gastarás más al ganar más."
+],
+"steps": [
+"Registra todos tus gastos un mes completo.",
+"Clasifícalos y encuentra las fugas.",
+"Automatiza una transferencia de ahorro el día de cobro."
+],
+"habits": [
+"Registrar gastos del día",
+"Transferir al ahorro al cobrar"
+],
+"links": [
+{
+"t": "Presupuesto 50/30/20",
+"u": "https://www.nerdwallet.com/article/finance/nerdwallet-budget-calculator"
+}
+]
+},
+{
+"id": "inversion",
+"branch": "dinero",
+"tier": 2,
+"x": -235,
+"y": 348,
+"icon": "◭",
+"need": [
+"presupuesto"
+],
+"title": "Inversión y patrimonio",
+"time": "Aprender 2–3 meses, aplicar décadas",
+"why": "El dinero parado pierde valor por la inflación. Invertir hace que tu dinero trabaje mientras duermes, gracias al interés compuesto, la fuerza más poderosa de las finanzas. Empezar pronto, aunque con poco, vence a empezar tarde con mucho.",
+"evidence": "La evidencia (Bogle, datos de SPIVA) muestra que la mayoría de gestores activos no superan al mercado a largo plazo tras comisiones. Los fondos indexados de bajo coste y la inversión periódica son la estrategia más respaldada para el inversor medio.",
+"tips": [
+"El interés compuesto premia el tiempo más que el monto.",
+"Diversifica: no pongas todo en un solo activo.",
+"Invierte solo lo que entiendes; si no, estúdialo antes."
+],
+"paradigms": [
+"'Invertir es para ricos' → Hoy se empieza con cantidades mínimas.",
+"'Es como apostar' → Apostar es azar; invertir con método es probabilidad a tu favor."
+],
+"steps": [
+"Forma un fondo de emergencia (3–6 meses de gastos) primero.",
+"Aprende qué son los fondos indexados y el interés compuesto.",
+"Invierte de forma constante y automática, sin adivinar el mercado."
+],
+"habits": [
+"Aportar a mi inversión este mes"
+],
+"links": [
+{
+"t": "Guía de inversión para principiantes",
+"u": "https://www.investopedia.com/articles/basics/06/invest1000.asp"
+}
+]
+},
+{
+"id": "ingresos",
+"branch": "dinero",
+"tier": 2,
+"x": -156,
+"y": 368,
+"icon": "⟁",
+"need": [
+"inversion"
+],
+"title": "Crear ingresos",
+"time": "6–18 meses para resultados",
+"why": "Por mucho que ahorres, hay un límite a lo que recortas; no hay límite a lo que generas. Aumentar y diversificar tus ingresos —con habilidades valiosas, negocios o activos— rompe el techo. Una sola fuente de ingreso es fragilidad.",
+"evidence": "El concepto de 'capital humano' en economía (Becker, Nobel) confirma que invertir en habilidades valiosas es uno de los retornos más altos disponibles para la mayoría de las personas.",
+"tips": [
+"Sube tu valor en el mercado: aprende habilidades que pagan bien.",
+"Construye algo que genere ingresos sin tu tiempo presente.",
+"Una segunda fuente de ingreso cambia tu psicología por completo."
+],
+"paradigms": [
+"'Solo se gana con un empleo' → El empleo es una fuente, no la única.",
+"'Necesito una idea original' → Resolver mejor un problema viejo basta."
+],
+"steps": [
+"Identifica una habilidad valiosa que puedas ofrecer.",
+"Lanza una versión mínima y consigue tu primer cliente.",
+"Reinvierte ganancias en mejorar o escalar."
+],
+"habits": [
+"Avanzar 30 min en mi proyecto de ingresos"
+],
+"links": [
+{
+"t": "Construir habilidades valiosas",
+"u": "https://www.indeed.com/career-advice/career-development/most-valuable-skills"
+}
+]
+},
+{
+"id": "fiscal",
+"branch": "dinero",
+"tier": 3,
+"x": -360,
+"y": 429,
+"icon": "▥",
+"need": [
+"inversion",
+"ingresos"
+],
+"title": "Impuestos y estructura",
+"time": "Estudio continuo",
+"why": "No es cuánto ganas, sino cuánto te queda después de impuestos. Entender la fiscalidad legal de tu país —deducciones, vehículos de inversión con ventajas, estructura de tus ingresos— puede ahorrarte cantidades enormes a lo largo de la vida, legalmente.",
+"evidence": "La planificación fiscal legal es una práctica estándar reconocida; el diferimiento de impuestos (pagar más tarde con vehículos de ventaja fiscal) tiene un efecto compuesto medible sobre el patrimonio final.",
+"tips": [
+"Aprende los vehículos de inversión con ventaja fiscal de tu país.",
+"Diferir impuestos legalmente potencia el interés compuesto.",
+"Un buen contador suele pagarse solo con lo que ahorra."
+],
+"paradigms": [
+"'Los impuestos son fijos e inevitables' → La cantidad legal a pagar depende de cómo estructures tus finanzas.",
+"'Optimizar impuestos es de ricos o tramposos' → La planificación legal está al alcance de cualquiera."
+],
+"steps": [
+"Estudia el sistema fiscal básico de tu país.",
+"Identifica las deducciones y cuentas con ventaja a las que accedes.",
+"Consulta a un profesional para tu situación concreta."
+],
+"habits": [
+"Aprender un concepto fiscal nuevo"
+],
+"links": [
+{
+"t": "Conceptos básicos de impuestos",
+"u": "https://www.investopedia.com/taxes-4427724"
+}
+]
+},
+{
+"id": "alma",
+"branch": "alma",
+"tier": 1,
+"x": -223,
+"y": -73,
+"icon": "✸",
+"need": [
+"core"
+],
+"title": "Alma y sentido",
+"time": "Camino de por vida",
+"why": "De nada sirve conquistar el mundo y perder tu paz interior. Esta rama es el ancla: propósito, valores, gratitud y regulación emocional. Es lo que sostiene a un hombre cuando todo lo externo falla. Sin alma, el poder se vuelve vacío.",
+"evidence": "El Harvard Study of Adult Development (>85 años de seguimiento) concluye que el sentido de propósito y la calidad de los vínculos predicen mejor el bienestar y la salud que el dinero o la fama.",
+"tips": [
+"El sentido no se encuentra, se construye con lo que valoras.",
+"La gratitud reescribe tu percepción de la realidad."
+],
+"paradigms": [
+"'El éxito externo dará sentido' → El sentido precede y sostiene al éxito."
+],
+"steps": [
+"Define tus valores fundamentales.",
+"Conecta tus acciones diarias con algo más grande."
+],
+"habits": [
+"3 cosas por las que estoy agradecido hoy"
+],
+"links": []
+},
+{
+"id": "proposito",
+"branch": "alma",
+"tier": 2,
+"x": -350,
+"y": -194,
+"icon": "✥",
+"need": [
+"alma"
+],
+"title": "Propósito y valores",
+"time": "Reflexión continua",
+"why": "Un hombre sin propósito es una hoja al viento: reacciona a todo y dirige nada. Definir para qué vives y qué principios no negocias te da una brújula. Cuando sabes quién eres, las decisiones difíciles se vuelven simples y dejas de buscar aprobación.",
+"evidence": "Estudios sobre propósito vital (Hill & Turiano, 2014) lo asocian a menor mortalidad. La logoterapia de Viktor Frankl, nacida de su experiencia en campos de concentración, sostiene que el sentido es el motor central del ser humano.",
+"study": {"t": "Hill & Turiano 2014 — propósito y longevidad", "u": "https://pubmed.ncbi.nlm.nih.gov/24815612/"},
+"tips": [
+"Pregúntate: si nadie me viera ni juzgara, ¿qué haría con mi vida?",
+"Define 3–5 valores innegociables y úsalos para decidir.",
+"El propósito suele estar donde tu talento cruza con lo que el mundo necesita."
+],
+"paradigms": [
+"'Debo encontrar mi pasión' → La pasión llega tras el dominio, no antes.",
+"'Mi valor depende de logros' → Tu valor es base; los logros son expresión."
+],
+"steps": [
+"Escribe tu propio funeral: ¿qué quieres que digan de ti?",
+"Define tus valores fundamentales por escrito.",
+"Filtra una decisión actual a través de esos valores."
+],
+"habits": [
+"Tomar 1 decisión alineada a mis valores"
+],
+"links": [
+{
+"t": "Ikigai: el sentido vital",
+"u": "https://es.wikipedia.org/wiki/Ikigai"
+}
+]
+},
+{
+"id": "emocional",
+"branch": "alma",
+"tier": 2,
+"x": -415,
+"y": -66,
+"icon": "❤",
+"need": [
+"alma"
+],
+"title": "Dominio emocional",
+"time": "3–6 meses de práctica",
+"why": "No eres tus emociones; eres quien las observa. Dominarlas no es reprimirlas, sino sentirlas sin que te gobiernen. Esto es el verdadero 'no se estresan': sienten todo, pero deciden su respuesta. Es la diferencia entre reaccionar y elegir.",
+"evidence": "La neurociencia (Lieberman, UCLA) muestra que nombrar una emoción ('affect labeling') reduce la actividad de la amígdala. La respiración lenta activa el sistema parasimpático y baja la respuesta de estrés de forma medible.",
+"study": {"t": "Lieberman — 'affect labeling' y amígdala", "u": "https://pubmed.ncbi.nlm.nih.gov/17473201/"},
+"tips": [
+"Nombra la emoción cuando aparece: nombrarla la reduce.",
+"Entre estímulo y respuesta hay un espacio; ahí vive tu libertad.",
+"Respira lento (4 seg dentro, 6 fuera) para apagar la alarma del cuerpo."
+],
+"paradigms": [
+"'Las emociones me controlan' → Puedes observarlas sin obedecerlas.",
+"'Los hombres no sienten' → Reprimir emociones las hace explotar peor."
+],
+"steps": [
+"Nombra lo que sientes 3 veces al día.",
+"Aprende respiración diafragmática para la tensión.",
+"Lleva un diario emocional una semana."
+],
+"habits": [
+"Respiración consciente 5 min",
+"Pausar y nombrar antes de reaccionar"
+],
+"links": [
+{
+"t": "Inteligencia emocional",
+"u": "https://www.verywellmind.com/what-is-emotional-intelligence-2795423"
+}
+]
+},
+{
+"id": "gratitud",
+"branch": "alma",
+"tier": 3,
+"x": -536,
+"y": -66,
+"icon": "✿",
+"need": [
+"proposito",
+"emocional"
+],
+"title": "Gratitud y optimismo",
+"time": "Efectos desde 2–3 semanas",
+"why": "La gratitud no es ingenuidad: es entrenar la atención para ver lo que sí tienes en vez de obsesionarte con lo que falta. Es uno de los hábitos con mejor relación coste-beneficio para el bienestar. Quien agradece vive el mismo mundo, pero lo percibe mejor.",
+"evidence": "Estudios de Emmons & McCullough (2003) mostraron que llevar un diario de gratitud semanal aumentaba el bienestar y el optimismo frente a grupos control. Es una de las intervenciones de psicología positiva mejor replicadas.",
+"study": {"t": "Emmons & McCullough 2003 — gratitud", "u": "https://pubmed.ncbi.nlm.nih.gov/12585811/"},
+"tips": [
+"Anota 3 cosas concretas por las que estás agradecido cada día.",
+"Escribe una carta de agradecimiento a alguien (aunque no la envíes).",
+"Saborea lo bueno: detente 10 segundos a registrar un momento agradable."
+],
+"paradigms": [
+"'La gratitud es conformismo' → Puedes agradecer lo que tienes y seguir aspirando a más.",
+"'Soy realista, no optimista' → El optimismo aprendido es entrenable y mejora resultados."
+],
+"steps": [
+"Empieza un diario de gratitud (3 ítems concretos al día).",
+"Escribe una carta de agradecimiento esta semana.",
+"Practica saborear un momento bueno cada día."
+],
+"habits": [
+"Diario de gratitud (3 cosas)",
+"Saborear un momento bueno"
+],
+"links": [
+{
+"t": "Ciencia de la gratitud",
+"u": "https://greatergood.berkeley.edu/topic/gratitude"
+}
+]
+},
+{
+"id": "meditacion",
+"branch": "alma",
+"tier": 3,
+"x": -485,
+"y": -280,
+"icon": "卐",
+"need": [
+"emocional"
+],
+"title": "Meditación y atención plena",
+"time": "Beneficios desde 2–8 semanas",
+"why": "La meditación entrena tu atención y te separa del ruido mental constante. No es misticismo: es ir al gimnasio para tu mente. Reduce la ansiedad, mejora el foco y te da un espacio de silencio en medio del caos. Quien medita habita su propia mente con calma.",
+"evidence": "Meta-análisis (Goyal et al., 2014, JAMA Internal Medicine) hallaron evidencia moderada de que los programas de mindfulness reducen ansiedad, depresión y dolor. Programas de 8 semanas (MBSR) muestran cambios medibles en regiones cerebrales de regulación emocional.",
+"study": {"t": "Goyal et al. 2014 — mindfulness (JAMA Int Med)", "u": "https://pubmed.ncbi.nlm.nih.gov/24395196/"},
+"tips": [
+"Empieza con 5 minutos; la constancia importa más que la duración.",
+"Cuando la mente se distraiga, vuelve a la respiración sin juzgarte.",
+"El objetivo no es 'no pensar', sino notar cuándo piensas."
+],
+"paradigms": [
+"'Meditar es poner la mente en blanco' → Es observar, no vaciar.",
+"'No tengo tiempo' → 10 min te devuelven horas de claridad."
+],
+"steps": [
+"Siéntate 5 min y observa tu respiración cada mañana.",
+"Sube a 10–15 min cuando sea cómodo.",
+"Añade momentos de silencio sin estímulos durante el día."
+],
+"habits": [
+"Meditar (mín. 5 min)",
+"Un momento de silencio sin pantallas"
+],
+"links": [
+{
+"t": "Cómo empezar a meditar",
+"u": "https://www.mindful.org/how-to-meditate/"
+},
+{
+"t": "Mindfulness (meta-análisis JAMA)",
+"u": "https://pubmed.ncbi.nlm.nih.gov/24395196/"
+}
+]
+},
+{
+"id": "social",
+"branch": "social",
+"tier": 1,
+"x": 223,
+"y": 73,
+"icon": "⚭",
+"need": [
+"core"
+],
+"title": "Vínculo y relaciones",
+"time": "Camino de por vida",
+"why": "Los estudios más largos sobre felicidad coinciden: la calidad de tus relaciones predice tu bienestar mejor que el dinero o la fama. Un hombre completo no es una isla; sabe conectar, comunicar y construir lazos profundos. Esta rama te hace querido y respetado, no solo temido.",
+"evidence": "El Harvard Study of Adult Development encontró que la calidad de las relaciones a los 50 predecía la salud a los 80 mejor que el colesterol. El aislamiento social tiene un impacto en mortalidad comparable al de fumar.",
+"study": {"t": "Holt-Lunstad — relaciones sociales y mortalidad", "u": "https://pubmed.ncbi.nlm.nih.gov/20668659/"},
+"tips": [
+"La calidad de tu vida es la calidad de tus relaciones.",
+"Dar antes de pedir construye redes que perduran."
+],
+"paradigms": [
+"'Necesitar a otros es debilidad' → La interdependencia es madurez, no dependencia."
+],
+"steps": [
+"Cultiva pocas relaciones profundas más que muchas superficiales.",
+"Conviértete en alguien que vale la pena conocer."
+],
+"habits": [
+"Contactar a alguien que aprecio"
+],
+"links": []
+},
+{
+"id": "comunicacion",
+"branch": "social",
+"tier": 2,
+"x": 350,
+"y": 194,
+"icon": "❞",
+"need": [
+"social"
+],
+"title": "Comunicación profunda",
+"time": "2–4 meses",
+"why": "Comunicar bien evita la mayoría de los conflictos humanos. Escuchar de verdad, expresar lo que sientes sin atacar y entender al otro transforma todas tus relaciones. Es una habilidad que casi nadie entrena y que te distingue al instante.",
+"evidence": "La investigación de Gottman sobre parejas identifica patrones de comunicación que predicen rupturas con +90% de precisión. La escucha activa y la validación están entre los predictores de relaciones sanas.",
+"tips": [
+"Escucha para entender, no para responder.",
+"Habla desde el 'yo siento' en vez del 'tú siempre'.",
+"Una pausa antes de responder evita el 90% de las peleas."
+],
+"paradigms": [
+"'Ya sé escuchar' → Escuchar de verdad es raro; casi todos esperan su turno.",
+"'Decir lo que pienso siempre es bueno' → El cómo importa tanto como el qué."
+],
+"steps": [
+"Repite lo que oíste antes de dar tu opinión.",
+"Usa mensajes en primera persona en una discusión real.",
+"Haz una pregunta de seguimiento genuina en cada charla."
+],
+"habits": [
+"Escuchar sin interrumpir en una conversación"
+],
+"links": [
+{
+"t": "Comunicación no violenta",
+"u": "https://es.wikipedia.org/wiki/Comunicaci%C3%B3n_no_violenta"
+}
+]
+},
+{
+"id": "limites",
+"branch": "social",
+"tier": 2,
+"x": 414,
+"y": 73,
+"icon": "⛨",
+"need": [
+"social"
+],
+"title": "Límites y respeto propio",
+"time": "3–6 meses",
+"why": "Sin límites, los demás te usan y tú te resientes. Decir 'no' sin culpa y defender tu tiempo y energía es auto-respeto. La gente te trata como te tratas a ti mismo. Poner límites no aleja a quien te quiere; filtra a quien te usa.",
+"evidence": "La investigación en asertividad la distingue de la pasividad y la agresividad como el estilo comunicativo asociado a mejor autoestima, menos ansiedad social y relaciones más sanas.",
+"tips": [
+"'No' es una frase completa; no siempre debes justificarte.",
+"Quien se enoja por tus límites se beneficiaba de que no los tuvieras.",
+"Tu tiempo y energía son finitos; protégelos."
+],
+"paradigms": [
+"'Poner límites es egoísta' → Es lo que permite relaciones sanas y duraderas.",
+"'Si digo no, me rechazarán' → El respeto verdadero crece con límites claros."
+],
+"steps": [
+"Identifica dónde dices 'sí' cuando quieres decir 'no'.",
+"Practica un 'no' amable pero firme esta semana.",
+"Define qué comportamientos no vas a tolerar."
+],
+"habits": [
+"Decir 'no' a algo que no quiero",
+"Proteger un bloque de tiempo para mí"
+],
+"links": [
+{
+"t": "Cómo poner límites sanos",
+"u": "https://www.psychologytoday.com/intl/basics/boundaries"
+}
+]
+},
+{
+"id": "liderazgo",
+"branch": "social",
+"tier": 3,
+"x": 523,
+"y": 201,
+"icon": "✦",
+"need": [
+"comunicacion",
+"limites"
+],
+"title": "Liderazgo y mentoría",
+"time": "Continuo",
+"why": "El nivel más alto de un hombre completo no es solo elevarse, sino elevar a otros. Liderar con el ejemplo, mentorear y servir multiplica tu impacto más allá de tu propia vida. Aquí el poder, la comunicación y el alma se unen: dejas de competir y empiezas a construir.",
+"evidence": "El liderazgo de servicio (Greenleaf) cuenta con evidencia en psicología organizacional de mayor compromiso y desempeño de equipos. Enseñar también consolida el aprendizaje propio (efecto protégé).",
+"tips": [
+"Lidera con el ejemplo antes que con palabras.",
+"Un buen líder hace sentir a otros más capaces, no menos.",
+"Tu legado son las personas que ayudaste a crecer."
+],
+"paradigms": [
+"'Liderar es mandar' → Liderar es servir y hacer crecer.",
+"'Si enseño, creo mi competencia' → Quien eleva a otros multiplica su valor."
+],
+"steps": [
+"Ayuda a alguien a mejorar en algo que dominas.",
+"Da crédito en público, corrige en privado.",
+"Sé el ejemplo del estándar que pides."
+],
+"habits": [
+"Ayudar a alguien a crecer hoy"
+],
+"links": [
+{
+"t": "Liderazgo de servicio",
+"u": "https://es.wikipedia.org/wiki/Liderazgo_de_servicio"
+}
+]
+},
+{
+"id": "eros",
+"branch": "eros",
+"tier": 1,
+"x": 223,
+"y": -73,
+"icon": "❡",
+"need": [
+"social"
+],
+"title": "Eros e intimidad",
+"time": "Camino de por vida",
+"why": "La sexualidad y la intimidad son parte central de una vida plena, y casi nadie las trabaja con madurez. No se trata de 'conquistar', sino de entender el deseo, la conexión y tu propio cuerpo, y de construir relaciones íntimas sanas, honestas y satisfactorias. Un hombre completo es maduro también aquí.",
+"evidence": "La investigación sexológica moderna (desde Masters & Johnson hasta Emily Nagoski) muestra que el deseo y la respuesta sexual son más variables y contextuales de lo que asume la cultura popular, y que la comunicación es central para la satisfacción.",
+"tips": [
+"La confianza y la seguridad emocional alimentan el deseo más que cualquier técnica.",
+"La comunicación sobre intimidad es una habilidad, no algo que 'debería salir solo'.",
+"La salud sexual es parte de la salud general; no la separes."
+],
+"paradigms": [
+"'El buen sexo es solo técnica' → El contexto emocional y la comunicación pesan más.",
+"'Hablar de esto mata la pasión' → Hablarlo bien suele aumentarla."
+],
+"steps": [
+"Edúcate con fuentes serias, no con pornografía como manual.",
+"Trabaja primero tu seguridad y tu comunicación.",
+"Construye intimidad emocional como base de la física."
+],
+"habits": [
+"Una conversación honesta sobre intimidad o deseo"
+],
+"links": [
+{
+"t": "Salud sexual (OMS)",
+"u": "https://www.who.int/health-topics/sexual-health"
+}
+]
+},
+{
+"id": "atraccion",
+"branch": "eros",
+"tier": 2,
+"x": 394,
+"y": -113,
+"icon": "✺",
+"need": [
+"eros"
+],
+"title": "Atracción y autenticidad",
+"time": "Continuo",
+"why": "La atracción genuina nace de ser una persona valiosa y segura, no de trucos. Trabajar tu salud, tu propósito, tu conversación y tu autenticidad te hace naturalmente atractivo. El carisma y la confianza que construyes en otras ramas se expresan aquí sin manipulación.",
+"evidence": "La psicología evolutiva y los estudios de atracción señalan factores como la confianza, el cuidado personal, el sentido del humor y la estabilidad emocional. La autenticidad correlaciona con mayor bienestar relacional que las estrategias de 'juego'.",
+"tips": [
+"Trabaja en ser interesante, no en parecerlo.",
+"La seguridad real viene de tener una vida plena, no de frases ensayadas.",
+"El respeto y la escucha atraen más que la insistencia."
+],
+"paradigms": [
+"'La atracción es manipulación' → La atracción sana nace de valor real, no de trucos.",
+"'Hay que fingir desinterés' → Los juegos de poder erosionan la confianza a la larga."
+],
+"steps": [
+"Invierte en tu salud, propósito y conversación (otras ramas).",
+"Practica conversar con autenticidad y curiosidad genuina.",
+"Suelta la necesidad de aprobación; mejora tu vida por ti."
+],
+"habits": [
+"Una interacción social auténtica sin buscar aprobación"
+],
+"links": [
+{
+"t": "Psicología de la atracción",
+"u": "https://www.psychologytoday.com/intl/basics/attraction"
+}
+]
+},
+{
+"id": "vinculo-pareja",
+"branch": "eros",
+"tier": 3,
+"x": 499,
+"y": -254,
+"icon": "⚭",
+"need": [
+"atraccion",
+"comunicacion"
+],
+"title": "Pareja y apego seguro",
+"time": "Continuo",
+"why": "Las relaciones duraderas y satisfactorias no son suerte: dependen de cómo gestionas el conflicto, la confianza y tu propio estilo de apego. Entender estos patrones te permite amar sin perderte y construir un vínculo que crece en vez de desgastarse.",
+"evidence": "La teoría del apego (Bowlby, Ainsworth) y su aplicación a adultos (Hazan & Shaver) tienen amplio respaldo. Gottman identificó los 'cuatro jinetes' (crítica, desprecio, defensividad, evasión) que predicen rupturas, y antídotos entrenables.",
+"study": {"t": "Gottman — predicción de divorcio", "u": "https://doi.org/10.2307/353438"},
+"tips": [
+"Conoce tu estilo de apego (seguro, ansioso, evitativo) y trabájalo.",
+"El desprecio es el mayor predictor de ruptura: elimínalo.",
+"Repara rápido tras un conflicto; no dejes que se acumule."
+],
+"paradigms": [
+"'El amor verdadero no requiere esfuerzo' → Los buenos vínculos se mantienen con habilidad consciente.",
+"'Si hay conflicto, algo va mal' → El conflicto bien gestionado fortalece la relación."
+],
+"steps": [
+"Identifica tu estilo de apego y sus disparadores.",
+"Aprende los 'cuatro jinetes' de Gottman y sus antídotos.",
+"Practica la reparación tras los desacuerdos."
+],
+"habits": [
+"Un gesto de aprecio sincero a mi pareja"
+],
+"links": [
+{
+"t": "Teoría del apego adulto",
+"u": "https://es.wikipedia.org/wiki/Teor%C3%ADa_del_apego"
+},
+{
+"t": "Los 4 jinetes (Gottman)",
+"u": "https://www.gottman.com/blog/the-four-horsemen-recognizing-criticism-contempt-defensiveness-and-stonewalling/"
+}
+]
+},
+{
+"id": "espiritu",
+"branch": "espiritu",
+"tier": 1,
+"x": -223,
+"y": 73,
+"icon": "✶",
+"need": [
+"alma"
+],
+"title": "Espíritu y trascendencia",
+"time": "Camino de por vida",
+"why": "Más allá de la psicología, existe una dimensión de asombro, conexión y trascendencia que las tradiciones humanas han explorado por milenios. No requiere dogma: se trata de cultivar la humildad ante algo más grande que tu ego, encontrar paz y vivir con un sentido profundo. Es el techo del árbol.",
+"evidence": "Estudios sobre asombro (Keltner) muestran que las experiencias de trascendencia reducen el enfoque en el ego, aumentan la generosidad y mejoran el bienestar. La práctica contemplativa aparece en casi todas las culturas humanas.",
+"study": {"t": "Stellar et al. — asombro y bienestar", "u": "https://pubmed.ncbi.nlm.nih.gov/25603133/"},
+"tips": [
+"La espiritualidad no exige religión; exige humildad y apertura.",
+"El asombro ante la naturaleza o el cosmos te reordena interiormente.",
+"Servir a algo más grande que tú da un sentido que el éxito personal no alcanza."
+],
+"paradigms": [
+"'Lo espiritual es irracional' → El asombro y el sentido son experiencias humanas universales, estudiables.",
+"'No necesito nada más allá de mí' → El ego inflado es una cárcel; la trascendencia libera."
+],
+"steps": [
+"Cultiva experiencias de asombro (naturaleza, arte, cosmos).",
+"Explora con respeto distintas tradiciones contemplativas.",
+"Practica el servicio desinteresado."
+],
+"habits": [
+"Un momento consciente de asombro"
+],
+"links": [
+{
+"t": "La ciencia del asombro",
+"u": "https://greatergood.berkeley.edu/topic/awe"
+}
+]
+},
+{
+"id": "filosofia",
+"branch": "espiritu",
+"tier": 2,
+"x": -388,
+"y": 133,
+"icon": "✜",
+"need": [
+"espiritu"
+],
+"title": "Filosofía y las grandes preguntas",
+"time": "Estudio de por vida",
+"why": "Las preguntas sobre la muerte, el sentido, la libertad y la ética han sido pensadas por las mentes más brillantes durante milenios. Leerlas no da respuestas fáciles, pero te da herramientas para vivir con más profundidad y menos miedo. Un hombre completo ha pensado seriamente cómo vivir.",
+"evidence": "La filosofía estoica, epicúrea y existencialista ha influido directamente en psicoterapias modernas. Confrontar conscientemente la finitud (memento mori) se asocia, bien encauzado, a una vida más intencional.",
+"tips": [
+"Empieza por la ética práctica: cómo vivir, no solo metafísica abstracta.",
+"Memento mori: recordar que morirás aclara qué importa de verdad.",
+"Lee despacio y discute; la filosofía se piensa, no se consume."
+],
+"paradigms": [
+"'La filosofía es inútil' → Estructura cómo piensas, decides y vives.",
+"'Pensar en la muerte es morboso' → Bien encauzado, hace la vida más intensa y clara."
+],
+"steps": [
+"Lee una introducción a la ética (estoicos, Aristóteles).",
+"Reflexiona sobre tu propia mortalidad sin miedo (memento mori).",
+"Discute las grandes preguntas con alguien."
+],
+"habits": [
+"10 min de lectura filosófica reflexiva"
+],
+"links": [
+{
+"t": "Introducción a la filosofía",
+"u": "https://plato.stanford.edu/"
+}
+]
+},
+{
+"id": "naturaleza",
+"branch": "espiritu",
+"tier": 3,
+"x": -494,
+"y": 263,
+"icon": "❀",
+"need": [
+"filosofia",
+"gratitud"
+],
+"title": "Naturaleza y silencio",
+"time": "Práctica continua",
+"why": "El contacto con la naturaleza y el silencio profundo son antídotos contra el ruido moderno. No es un lujo: reconectan tu sistema nervioso, despiertan el asombro y te recuerdan tu lugar en algo inmenso. La paz más profunda suele encontrarse lejos de las pantallas y cerca de los árboles.",
+"evidence": "Estudios sobre baño de bosque (shinrin-yoku) y tiempo en naturaleza muestran reducción de cortisol, presión arterial y rumiación. Una investigación sugiere que ~120 minutos semanales en naturaleza se asocian a mejor salud y bienestar.",
+"study": {"t": "White et al. 2019 — 120 min en naturaleza (Nature)", "u": "https://www.nature.com/articles/s41598-019-44097-3"},
+"tips": [
+"Pasa tiempo en naturaleza sin auriculares ni teléfono.",
+"Apunta a un par de horas semanales en entornos naturales.",
+"Practica el silencio: deja espacios sin estímulo para escucharte."
+],
+"paradigms": [
+"'La naturaleza es para vacaciones' → Es una necesidad regular del sistema nervioso.",
+"'Necesito estímulo constante' → El silencio no es vacío; es donde te encuentras."
+],
+"steps": [
+"Programa salidas regulares a entornos naturales.",
+"Pasa tiempo sin pantallas ni música, solo presente.",
+"Observa con atención plena un elemento natural."
+],
+"habits": [
+"Tiempo en naturaleza sin pantallas",
+"Un rato de silencio total"
+],
+"links": [
+{
+"t": "Naturaleza y salud (120 min/semana)",
+"u": "https://www.nature.com/articles/s41598-019-44097-3"
+}
+]
+},
+{
+"id": "oficio",
+"branch": "oficio",
+"tier": 1,
+"x": 0,
+"y": 235,
+"icon": "⚒",
+"need": [
+"core"
+],
+"title": "Oficio y manos",
+"time": "Camino de por vida",
+"why": "Saber hacer cosas con tus manos —arreglar, construir, cocinar, crear— te da autonomía, confianza y una satisfacción que ninguna pantalla iguala. En un mundo de consumidores pasivos, ser alguien capaz de producir y reparar es poder real y tangible.",
+"evidence": "La psicología del 'flow' (Csikszentmihalyi) muestra que las actividades manuales con reto adecuado producen estados de absorción y bienestar. El trabajo manual se asocia a satisfacción por la retroalimentación directa y visible.",
+"tips": [
+"Empieza por una habilidad útil de tu vida diaria.",
+"Hacer mal algo y mejorar es el camino; no esperes a 'estar listo'.",
+"La capacidad de reparar te ahorra dinero y te da independencia."
+],
+"paradigms": [
+"'No soy bueno con las manos' → Es falta de práctica, no de capacidad.",
+"'Mejor lo compro o lo pago' → Crear y reparar dan autonomía y orgullo que el consumo no."
+],
+"steps": [
+"Elige una habilidad manual útil para empezar.",
+"Aprende lo básico con tutoriales y practica de inmediato.",
+"Repara o construye algo real esta semana."
+],
+"habits": [
+"Avanzar en un proyecto manual"
+],
+"links": []
+},
+{
+"id": "cocina",
+"branch": "oficio",
+"tier": 2,
+"x": -83,
+"y": 391,
+"icon": "☗",
+"need": [
+"oficio"
+],
+"title": "Cocina y autosuficiencia",
+"time": "2–4 meses para soltura",
+"why": "Cocinar bien es de las habilidades más rentables que existen: mejora tu salud, ahorra dinero, impresiona y te hace independiente. Quien sabe cocinar controla lo que entra a su cuerpo y nunca depende del delivery. Es nutrición, creatividad y cuidado propio en una sola habilidad.",
+"evidence": "Cocinar en casa se asocia a dietas de mayor calidad nutricional y menor ingesta calórica frente a comer fuera, según estudios de salud pública. Es una vía directa para aplicar la rama de nutrición.",
+"study": {"t": "Cocinar en casa y calidad de dieta", "u": "https://pubmed.ncbi.nlm.nih.gov/25399031/"},
+"tips": [
+"Domina 5–7 platos base y mejóralos antes de buscar variedad.",
+"Aprende técnicas (saltear, asar, sazonar), no solo recetas.",
+"Cocina tandas grandes y guarda porciones para la semana."
+],
+"paradigms": [
+"'No tengo tiempo de cocinar' → Cocinar en tandas ahorra tiempo y dinero a la larga.",
+"'Cocinar bien es complicado' → Pocas técnicas básicas cubren la mayoría de los platos."
+],
+"steps": [
+"Aprende a cocinar 5 platos saludables que te gusten.",
+"Practica las técnicas básicas, no solo seguir recetas.",
+"Haz 'meal prep' un día a la semana."
+],
+"habits": [
+"Cocinar una comida en casa",
+"Preparar comida para varios días"
+],
+"links": [
+{
+"t": "Técnicas básicas de cocina",
+"u": "https://www.seriouseats.com/cooking-techniques-5117679"
+}
+]
+},
+{
+"id": "reparar",
+"branch": "oficio",
+"tier": 2,
+"x": 80,
+"y": 412,
+"icon": "⚙",
+"need": [
+"oficio"
+],
+"title": "Reparar y construir",
+"time": "Continuo",
+"why": "Cambiar un enchufe, montar un mueble, arreglar una fuga, entender herramientas básicas: estas habilidades te ahorran dinero, te dan independencia y construyen una confianza que se nota. Dejar de sentirte indefenso ante un problema doméstico es profundamente empoderador.",
+"evidence": "El aprendizaje de habilidades técnicas concretas fortalece la autoeficacia (Bandura): cada problema resuelto con tus manos aumenta la creencia general en tu propia capacidad, que se transfiere a otras áreas.",
+"tips": [
+"Aprende a usar las herramientas básicas (taladro, destornilladores, llave).",
+"YouTube tiene un tutorial para casi cualquier reparación doméstica.",
+"Empieza por arreglos pequeños y sube de dificultad."
+],
+"paradigms": [
+"'Para eso se llama a un profesional' → Muchas reparaciones básicas las haces tú.",
+"'Lo voy a romper más' → El error controlado es cómo se aprende a hacer."
+],
+"steps": [
+"Arma un kit básico de herramientas.",
+"Aprende 3 reparaciones domésticas comunes.",
+"Arregla o construye algo real esta semana."
+],
+"habits": [
+"Resolver una reparación o montaje yo mismo"
+],
+"links": [
+{
+"t": "Reparaciones básicas del hogar",
+"u": "https://www.familyhandyman.com/"
+}
+]
+},
+{
+"id": "creatividad",
+"branch": "oficio",
+"tier": 3,
+"x": -10,
+"y": 560,
+"icon": "✑",
+"need": [
+"cocina",
+"reparar"
+],
+"title": "Crear y expresar arte",
+"time": "Continuo",
+"why": "Crear algo —escribir, tocar música, dibujar, fotografiar— no es un lujo de artistas: es una vía de expresión, procesamiento emocional y sentido. No necesitas ser bueno para beneficiarte; el acto de crear, más que el resultado, es lo que nutre. Un hombre completo también crea, no solo consume.",
+"evidence": "Estudios en arteterapia y escritura expresiva (Pennebaker) muestran que expresar experiencias por escrito mejora la salud mental e incluso física. La creatividad regular se asocia a mayor bienestar afectivo.",
+"study": {"t": "Pennebaker — escritura expresiva y salud", "u": "https://pubmed.ncbi.nlm.nih.gov/16187303/"},
+"tips": [
+"Elige un medio que te atraiga y practica sin exigirte maestría.",
+"Crea para ti primero; el resultado importa menos que el proceso.",
+"La constancia (un poco cada día) supera a la inspiración esporádica."
+],
+"paradigms": [
+"'No soy creativo' → La creatividad es una habilidad practicable, no un don fijo.",
+"'Si no soy bueno, no vale la pena' → El beneficio está en crear, no en destacar."
+],
+"steps": [
+"Elige un medio creativo (escribir, música, dibujo, foto).",
+"Dedica un rato fijo a la semana a crear.",
+"Comparte algo con alguien de confianza."
+],
+"habits": [
+"Crear algo (aunque sea pequeño)"
+],
+"links": [
+{
+"t": "Escritura expresiva (Pennebaker)",
+"u": "https://www.apa.org/monitor/jun02/writing"
+}
+]
+},
+{
+"id": "lengua",
+"branch": "lengua",
+"tier": 1,
+"x": -138,
+"y": -190,
+"icon": "✍",
+"need": [
+"mente"
+],
+"title": "Lenguas y mundos",
+"time": "Camino de por vida",
+"why": "Cada idioma que aprendes es una segunda ventana al mundo: otra cultura, otras personas, otras oportunidades de trabajo y conexión. Aprender lenguas también fortalece tu cerebro y tu disciplina. Quien habla varios idiomas se mueve en más mundos y entiende a más gente.",
+"evidence": "El bilingüismo se asocia a ventajas en función ejecutiva y a un posible retraso en la aparición de síntomas de demencia (Bialystok et al.), aunque el tamaño del efecto se debate. El acceso laboral y cultural que abre es claro.",
+"study": {"t": "Bialystok — bilingüismo y función ejecutiva", "u": "https://pubmed.ncbi.nlm.nih.gov/22155483/"},
+"tips": [
+"La constancia diaria vence a las sesiones largas y esporádicas.",
+"Aprende las palabras más frecuentes primero: cubren la mayoría del uso.",
+"Hablar desde el día uno, aunque mal, acelera todo."
+],
+"paradigms": [
+"'Soy malo para los idiomas' → Casi siempre es método y constancia, no aptitud.",
+"'Hay que esperar a hablar bien' → Hablar mal y temprano es el camino más rápido."
+],
+"steps": [
+"Elige un idioma con un motivo real (trabajo, viaje, personas).",
+"Estudia un poco cada día, sin falta.",
+"Busca práctica con hablantes desde el principio."
+],
+"habits": [
+"Practicar idioma 15 min hoy"
+],
+"links": []
+},
+{
+"id": "metodo-idioma",
+"branch": "lengua",
+"tier": 2,
+"x": -229,
+"y": -340,
+"icon": "❖",
+"need": [
+"lengua",
+"aprender"
+],
+"title": "Método de adquisición",
+"time": "Aplicable de inmediato",
+"why": "La diferencia entre quien aprende un idioma en un año y quien lleva una década estancado casi nunca es el talento: es el método. Aplicar la ciencia del aprendizaje a los idiomas —input comprensible, repaso espaciado, práctica activa— multiplica tu velocidad de forma drástica.",
+"evidence": "La hipótesis del input comprensible (Krashen) y la evidencia sobre repaso espaciado y recuerdo activo (mismos meta-análisis del nodo 'Aprender a aprender') sustentan métodos modernos eficaces frente a la memorización mecánica de gramática.",
+"tips": [
+"Consume mucho contenido un poco por encima de tu nivel (input comprensible).",
+"Usa repaso espaciado (Anki) para vocabulario, no listas que olvidarás.",
+"Sombrea audio nativo (escucha y repite en voz alta a la vez)."
+],
+"paradigms": [
+"'Hay que dominar la gramática antes de hablar' → El uso real enseña la gramática mejor.",
+"'Memorizar listas funciona' → El vocabulario se fija con contexto y repaso espaciado."
+],
+"steps": [
+"Consigue contenido en el idioma a tu nivel +1.",
+"Monta un sistema de repaso espaciado para vocabulario.",
+"Practica 'shadowing' con audio nativo a diario."
+],
+"habits": [
+"Repaso espaciado de vocabulario",
+"10 min de input comprensible"
+],
+"links": [
+{
+"t": "Input comprensible (Krashen)",
+"u": "https://es.wikipedia.org/wiki/Stephen_Krashen"
+}
+]
+},
+{
+"id": "fluidez",
+"branch": "lengua",
+"tier": 3,
+"x": -396,
+"y": -396,
+"icon": "❞",
+"need": [
+"metodo-idioma"
+],
+"title": "Fluidez y conversación",
+"time": "6–18 meses con práctica",
+"why": "La fluidez no llega estudiando en silencio: llega hablando, equivocándote y ajustando. Superar el miedo a sonar mal es el último gran obstáculo. Conversar de verdad con hablantes nativos es donde el idioma deja de ser una materia y se vuelve una segunda voz tuya.",
+"evidence": "La práctica de producción (output, Swain) y la interacción son necesarias para la fluidez, no solo el input. La exposición a hablantes y la corrección en contexto aceleran la automatización del idioma.",
+"tips": [
+"Habla con nativos lo antes posible (intercambios, apps, clases).",
+"No temas equivocarte; los errores son datos que te corrigen.",
+"Piensa en el idioma: narra tu día mentalmente en él."
+],
+"paradigms": [
+"'Practicaré cuando sea fluido' → Se vuelve fluido practicando, no antes.",
+"'Los errores son vergonzosos' → Son imprescindibles e indican que estás aprendiendo."
+],
+"steps": [
+"Agenda conversaciones regulares con hablantes.",
+"Narra tu día mentalmente en el idioma objetivo.",
+"Pide corrección y anota tus errores frecuentes."
+],
+"habits": [
+"Una conversación real en el idioma",
+"Pensar/narrar mi día en el idioma"
+],
+"links": [
+{
+"t": "Apps de intercambio de idiomas",
+"u": "https://www.tandem.net/"
+}
+]
+}
+];
+
+/* ---- Rutas guiadas (caminos predefinidos sugeridos) ---- */
+const PATHS = [
+  {id:"cimientos", name:"Los Cimientos", icon:"⛬",
+   desc:"El orden mínimo para no construir sobre arena. Empieza aquí si no sabes por dónde.",
+   seq:["core","mente","foco","cuerpo","fuerza","alma","emocional"]},
+  {id:"calma", name:"La Mente Serena", icon:"☉",
+   desc:"Para dejar de estresarte y pensar con claridad bajo presión.",
+   seq:["core","mente","estoicismo","alma","emocional","meditacion","mente","foco"]},
+  {id:"presencia", name:"El Hombre que Impone", icon:"♔",
+   desc:"Presencia, influencia y palabra. Para que tu valor se note.",
+   seq:["core","poder","carisma","leyes-poder","oratoria","social","comunicacion"]},
+  {id:"vehiculo", name:"El Cuerpo Forjado", icon:"❦",
+   desc:"Salud, fuerza y energía como base física de todo lo demás.",
+   seq:["core","cuerpo","fuerza","nutricion","sueno","cardio"]},
+  {id:"libertad", name:"La Libertad Financiera", icon:"◈",
+   desc:"De controlar tu dinero a hacerlo crecer y multiplicar tus fuentes.",
+   seq:["core","dinero","presupuesto","inversion","ingresos"]},
+  {id:"vinculos", name:"El Arte de Vincular", icon:"⚭",
+   desc:"Relaciones profundas, intimidad madura y saber poner límites.",
+   seq:["core","social","comunicacion","limites","eros","atraccion","vinculo-pareja"]},
+  {id:"sabio", name:"El Sabio Completo", icon:"✶",
+   desc:"Profundidad: sentido, filosofía, espíritu y conocimiento.",
+   seq:["core","mente","aprender","alma","proposito","espiritu","filosofia","lengua"]},
+];
+
+/* ---- Módulo de dominio sobre vicios/hábitos no deseados ---- */
+const VICE_DEFS = [
+  {id:"lujuria", name:"Lujuria / impulso sexual", icon:"🜂",
+   why_default:"Quiero recuperar el control de mi atención y mi energía, y dejar de que un impulso decida por mí.",
+   triggers:["Aburrimiento","Soledad","Estrés / ansiedad","De noche / sin dormir","Redes sociales","Estar solo con el teléfono","Después de discutir","Cansancio"]},
+];
+const SKILLS = [
+{
+"id": "sk-ventas",
+"area": "dinero",
+"name": "Ventas y cierre",
+"icon": "💬",
+"req": 3,
+"durable": "Mientras existan negocios, alguien tiene que vender. La venta es la habilidad que más rápido se convierte en dinero y la IA no reemplaza la confianza humana en tratos importantes.",
+"start": "Aprende a escuchar el problema del cliente antes de ofrecer. Practica con productos reales (los tuyos o ajenos por comisión).",
+"proof": "Registra una venta real cerrada: qué vendiste y por cuánto.",
+"resource": {
+"t": "Fundamentos de ventas (HubSpot)",
+"u": "https://www.hubspot.com/sales"
+}
+},
+{
+"id": "sk-copywriting",
+"area": "dinero",
+"name": "Copywriting persuasivo",
+"icon": "✍",
+"req": 3,
+"durable": "Escribir para vender es de las habilidades mejor pagadas y más portátiles: sirve para tu negocio, para clientes y para cualquier producto. La IA ayuda, pero quien sabe dirigirla escribe mejor que ella sola.",
+"start": "Estudia estructuras (AIDA, PAS). Reescribe anuncios que veas mal hechos. Escribe 1 texto de venta al día.",
+"proof": "Registra un texto de venta que escribiste y el resultado (clics, respuestas o ventas).",
+"resource": {
+"t": "Guía de copywriting",
+"u": "https://www.copyblogger.com/copywriting-101/"
+}
+},
+{
+"id": "sk-freelance",
+"area": "dinero",
+"name": "Servicio freelance",
+"icon": "⟁",
+"req": 5,
+"durable": "Vender un servicio (diseño, edición, gestión, redacción) es el camino más corto a ingresos extra sin pedir permiso. Las plataformas cambian; la habilidad de entregar valor a un cliente no.",
+"start": "Elige UNA habilidad que ya tengas a medias. Ofrécela barata a tus primeros 3 clientes a cambio de testimonios.",
+"proof": "Registra tu primer cliente pagado y lo que entregaste.",
+"resource": {
+"t": "Cómo empezar como freelance",
+"u": "https://www.upwork.com/resources/how-to-start-freelancing"
+}
+},
+{
+"id": "sk-ia",
+"area": "mente",
+"name": "IA aplicada y prompting",
+"icon": "❖",
+"req": 3,
+"durable": "No te reemplaza la IA: te reemplaza quien sabe usarla mejor que tú. Saber dirigir modelos para resolver problemas reales es la ventaja laboral más grande de esta década.",
+"start": "Toma una tarea repetitiva de tu vida o trabajo y resuélvela con una IA. Aprende a dar contexto, ejemplos y formato.",
+"proof": "Registra un problema real que resolviste usando IA y cuánto tiempo te ahorró.",
+"resource": {
+"t": "Guía de prompting",
+"u": "https://www.promptingguide.ai/es"
+}
+},
+{
+"id": "sk-datos",
+"area": "mente",
+"name": "Análisis de datos",
+"icon": "◭",
+"req": 5,
+"durable": "Toda empresa genera datos y casi ninguna sabe leerlos. Saber sacar conclusiones de números (aunque sea con hojas de cálculo) es demanda que crece ~35% esta década.",
+"start": "Domina hojas de cálculo de verdad (tablas dinámicas, fórmulas). Luego da el salto a SQL básico.",
+"proof": "Registra un análisis que hiciste: qué pregunta respondiste con datos.",
+"resource": {
+"t": "Análisis de datos (Khan Academy)",
+"u": "https://www.khanacademy.org/math/statistics-probability"
+}
+},
+{
+"id": "sk-marketing",
+"area": "poder",
+"name": "Marketing digital",
+"icon": "✺",
+"req": 3,
+"durable": "Captar atención y convertirla en clientes es lo que sostiene cualquier negocio o marca personal. Las plataformas cambian; entender audiencias, oferta y mensaje no caduca.",
+"start": "Elige una plataforma y publica con constancia sobre un tema que domines. Estudia qué contenido retiene atención.",
+"proof": "Registra una pieza de contenido que publicaste y su alcance o resultado.",
+"resource": {
+"t": "Fundamentos de marketing (Google)",
+"u": "https://learndigital.withgoogle.com/digitalgarage"
+}
+},
+{
+"id": "sk-marca",
+"area": "poder",
+"name": "Marca personal",
+"icon": "♔",
+"req": 5,
+"durable": "En un mundo de IA genérica, tu nombre y reputación son el activo que no se puede automatizar. Construir audiencia propia te da oportunidades que ningún CV consigue.",
+"start": "Elige un tema, una plataforma y publica con tu voz real 3 veces por semana. Aporta valor antes de pedir nada.",
+"proof": "Registra tu crecimiento: seguidores, contactos o oportunidades que llegaron por tu marca.",
+"resource": {
+"t": "Construir marca personal",
+"u": "https://www.atlassian.com/blog/leadership/personal-branding"
+}
+},
+{
+"id": "sk-programacion",
+"area": "oficio",
+"name": "Programación",
+"icon": "⚙",
+"req": 3,
+"durable": "Aunque la IA escriba código, alguien tiene que dirigirla, entenderla y arreglar lo que rompe. Saber programar te da poder de crear herramientas, productos y automatizaciones propias.",
+"start": "Aprende Python: es legible y sirve para todo. Construye proyectos pequeños y reales, no solo tutoriales.",
+"proof": "Registra un programa o script que construiste y para qué sirve.",
+"resource": {
+"t": "Python desde cero",
+"u": "https://www.freecodecamp.org/espanol/"
+}
+},
+{
+"id": "sk-automatizacion",
+"area": "oficio",
+"name": "Automatización",
+"icon": "⟆",
+"req": 5,
+"durable": "Conectar herramientas para que el trabajo repetitivo se haga solo es habilidad de altísimo valor: ahorra horas a empresas y a ti. Crece con la ola de IA, no contra ella.",
+"start": "Identifica una tarea que repites cada semana. Automatízala con herramientas no-code (Zapier, Make) o scripts.",
+"proof": "Registra una automatización que creaste y las horas que ahorra.",
+"resource": {
+"t": "Automatización no-code",
+"u": "https://zapier.com/learn/"
+}
+},
+{
+"id": "sk-coaching",
+"area": "cuerpo",
+"name": "Entrenar a otros",
+"icon": "⊿",
+"req": 5,
+"durable": "Cuando dominas tu cuerpo, enseñar a otros a hacerlo es un servicio que se paga y crece. La salud y el rendimiento físico son demanda permanente.",
+"start": "Aplica lo aprendido en la rama Cuerpo en ti mismo primero. Luego ayuda gratis a 1-2 personas y pide resultados.",
+"proof": "Registra a alguien que ayudaste a mejorar y su resultado.",
+"resource": {
+"t": "Bases de entrenamiento",
+"u": "https://www.strongerbyscience.com/"
+}
+},
+{
+"id": "sk-negociacion-sk",
+"area": "social",
+"name": "Negociación profesional",
+"icon": "⇄",
+"req": 5,
+"durable": "Negociar mejor sueldo, mejores tratos y acuerdos te genera dinero directo toda la vida. Es de las habilidades con mayor retorno por hora invertida.",
+"start": "Antes de cada negociación define tu alternativa (BATNA). Practica pedir y luego callar.",
+"proof": "Registra una negociación real y qué conseguiste que antes no tenías.",
+"resource": {
+"t": "Negociación (Harvard PON)",
+"u": "https://www.pon.harvard.edu/"
+}
+},
+{
+"id": "sk-ingles-pro",
+"area": "lengua",
+"name": "Inglés profesional",
+"icon": "✍",
+"req": 3,
+"durable": "El inglés multiplica tu acceso a clientes, trabajos remotos mejor pagados y conocimiento. Es la palanca de ingresos más subestimada para hispanohablantes.",
+"start": "Cambia el consumo que ya haces (videos, lecturas) a inglés. Practica hablar en voz alta a diario.",
+"proof": "Registra algo real que hiciste en inglés: una entrevista, un cliente, un trabajo.",
+"resource": {
+"t": "Práctica de inglés",
+"u": "https://www.bbc.co.uk/learningenglish/"
+}
+}
+];
+
+</script>
+<script>
+/* ================= SENDA — motor ================= */
+(function(){
+"use strict";
+
+/* ---------- estado persistente ---------- */
+const KEY_DONE="senda_done", KEY_HAB="senda_habits", KEY_NOTE="senda_notes",
+      KEY_PRAC="senda_practice", KEY_CHK="senda_checks";
+let DONE=new Set();         // nodos completados (dominados)
+let HAB={};                 // {habitText: {count, last, days:[fechas]}}
+let NOTES={};               // {nodeId: texto}
+let PRAC={};                // {nodeId: {started: fecha, lastTouch: fecha}}  nodos en práctica
+let CHECKS={};              // {nodeId: {answers, date}}  respuestas del check honesto
+
+/* ---------- capa de persistencia universal ----------
+   Dentro de Claude existe window.storage; en Vercel / celular
+   usamos localStorage. Esta capa elige automáticamente. */
+const hasClaudeStore = (typeof window!=="undefined" && window.storage && window.storage.get);
+const hasLocal = (function(){ try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); return true; }catch(e){ return false; } })();
+
+async function storeGet(key){
+  try{
+    if(hasClaudeStore){ const r=await window.storage.get(key).catch(()=>null); return r&&r.value!=null?r.value:null; }
+    if(hasLocal){ return localStorage.getItem(key); }
+  }catch(e){}
+  return null;
+}
+async function storeSet(key,valStr){
+  try{
+    if(hasClaudeStore){ await window.storage.set(key,valStr); }
+    if(hasLocal){ localStorage.setItem(key,valStr); }   // escribe en ambos por si acaso
+  }catch(e){}
+}
+
+async function loadState(){
+  try{
+    const a=await storeGet(KEY_DONE); if(a) DONE=new Set(JSON.parse(a));
+    const b=await storeGet(KEY_HAB);  if(b) HAB=JSON.parse(b);
+    const c=await storeGet(KEY_NOTE); if(c) NOTES=JSON.parse(c);
+    const d=await storeGet(KEY_PRAC); if(d) PRAC=JSON.parse(d);
+    const e=await storeGet(KEY_CHK);  if(e) CHECKS=JSON.parse(e);
+  }catch(e){}
+}
+async function save(key,val){
+  try{ await storeSet(key,JSON.stringify(val)); }catch(e){}
+}
+const saveDone=()=>save(KEY_DONE,[...DONE]);
+const saveHab =()=>save(KEY_HAB,HAB);
+const saveNote=()=>save(KEY_NOTE,NOTES);
+const savePrac=()=>save(KEY_PRAC,PRAC);
+const saveChk =()=>save(KEY_CHK,CHECKS);
+
+/* ---------- utilidades de fecha ---------- */
+const DAY=86400000;
+const todayKey=()=>{ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); };
+function keyToDate(k){ const [y,m,d]=k.split("-").map(Number); return new Date(y,m-1,d); }
+function daysBetween(k1,k2){ return Math.round((keyToDate(k2)-keyToDate(k1))/DAY); }
+function daysAgo(k){ return k?daysBetween(k,todayKey()):999; }
+// días distintos con hábito registrado en los nodos, en los últimos N días
+function recentHabitDays(habitList,within){
+  const lim=within||14;
+  const set=new Set();
+  habitList.forEach(h=>{
+    const rec=HAB[h]; if(!rec||!rec.days) return;
+    rec.days.forEach(d=>{ if(daysAgo(d)<lim) set.add(d); });
+  });
+  return set.size;
+}
+
+/* ---------- índices ---------- */
+const byId={}; NODES.forEach(n=>byId[n.id]=n);
+function prereqMet(n){ return !n.need || n.need.every(p=>DONE.has(p)); }
+
+// ¿este nodo exige práctica sostenida? (tiene hábitos y no es un nodo raíz/conceptual breve)
+function requiresPractice(n){ return n.habits && n.habits.length>0 && n.tier>0; }
+// días de constancia requeridos para dominar (escala con la importancia del nodo)
+function requiredDays(n){
+  if(!requiresPractice(n)) return 0;
+  if(n.tier===1) return 5;   // rama mayor
+  if(n.tier===3) return 7;   // habilidad profunda
+  return 6;                  // tier 2
+}
+// días de práctica reales acumulados para un nodo
+function practiceDays(n){
+  if(!n.habits) return 0;
+  return recentHabitDays(n.habits, 21);
+}
+// progreso de práctica 0..1
+function practiceProgress(n){
+  const req=requiredDays(n); if(req===0) return 1;
+  return Math.min(1, practiceDays(n)/req);
+}
+
+function status(n){
+  if(DONE.has(n.id)) return "done";
+  if(!prereqMet(n)) return "locked";
+  if(PRAC[n.id]) return "practicing";
+  return "available";
+}
+
+/* ---------- nivel ---------- */
+// Cada nodo completado = XP. Subir de nivel cada N nodos crecientes.
+function levelInfo(){
+  const done=DONE.size;
+  // umbrales acumulados: 0,3,7,12,18,25,33...
+  let lvl=1, need=3, acc=0, step=3;
+  while(done>=acc+step){ acc+=step; lvl++; step++; }
+  const into=done-acc;          // nodos dentro del nivel
+  const span=step;              // nodos para el siguiente
+  return {lvl,into,span,done};
+}
+function renderLevel(){
+  const {lvl,into,span,done}=levelInfo();
+  document.getElementById("lvl").textContent=lvl;
+  document.getElementById("xpfill").style.width=(into/span*100)+"%";
+  document.getElementById("xpsub").textContent=`${done} nodos · faltan ${span-into} para nivel ${lvl+1}`;
+}
+
+/* ---------- coordenadas / viewport ---------- */
+const world=document.getElementById("world");
+const stage=document.getElementById("stage");
+const svg=document.getElementById("lines");
+let OX=0,OY=0,SCALE=1;        // offset y escala
+const MIN=.32,MAX=1.9;
+
+function apply(){ world.style.transform=`translate(${OX}px,${OY}px) scale(${SCALE})`; }
+function centerOn(wx,wy,sc){
+  SCALE=sc||SCALE;
+  OX=window.innerWidth/2 - wx*SCALE;
+  OY=window.innerHeight/2 - wy*SCALE;
+  apply();
+}
+
+/* ---------- construir nodos + líneas ---------- */
+const elById={};
+function build(){
+  // líneas
+  let lp="";
+  NODES.forEach(n=>{
+    if(!n.need) return;
+    n.need.forEach(pid=>{
+      const p=byId[pid]; if(!p) return;
+      lp+=`<line id="L_${pid}_${n.id}" x1="${p.x}" y1="${p.y}" x2="${n.x}" y2="${n.y}" />`;
+    });
+  });
+  svg.innerHTML=lp;
+  svg.setAttribute("width","4000"); svg.setAttribute("height","4000");
+  svg.style.left="-2000px"; svg.style.top="-2000px";
+  svg.setAttribute("viewBox","-2000 -2000 4000 4000");
+
+  // nodos
+  NODES.forEach(n=>{
+    const b=BRANCHES[n.branch];
+    const el=document.createElement("div");
+    el.className="node "+(n.tier===0?"core":n.tier===1?"major":"");
+    el.style.left=(n.x)+"px"; el.style.top=(n.y)+"px";
+    el.style.setProperty("--bcol",b.css);
+    el.innerHTML=`<div class="glyph"><span class="ring"></span>${n.icon}<div class="check">✓</div><div class="pdot">◐</div></div>
+                  <div class="lbl">${n.title}</div>`;
+    // posición absoluta dentro de world (que va de -inf..inf): usamos translate via left/top con offset 2000
+    el.style.left=(n.x)+"px"; el.style.top=(n.y)+"px";
+    el.addEventListener("click",e=>{e.stopPropagation();open(n);});
+    world.appendChild(el);
+    elById[n.id]=el;
+  });
+  refreshAll();
+}
+
+function refreshAll(){
+  NODES.forEach(n=>{
+    const el=elById[n.id]; if(!el) return;
+    el.classList.remove("locked","available","done","practicing");
+    el.classList.add(status(n));
+    const pdot=el.querySelector(".pdot");
+    if(pdot) pdot.style.display=(status(n)==="practicing")?"grid":"none";
+  });
+  // líneas activas
+  NODES.forEach(n=>{
+    if(!n.need) return;
+    n.need.forEach(pid=>{
+      const ln=document.getElementById(`L_${pid}_${n.id}`);
+      if(!ln) return;
+      const done=DONE.has(n.id);
+      const avail=DONE.has(pid);
+      const col=done?BRANCHES[n.branch].css:(avail?"#2a3038":"#161b22");
+      ln.setAttribute("stroke",col);
+      ln.setAttribute("stroke-width",done?"3":"1.5");
+      ln.style.opacity=avail?"1":".5";
+    });
+  });
+  renderLevel();
+}
+
+/* ---------- leyenda / filtros ---------- */
+const HIDDEN=new Set();
+function buildLegend(){
+  const wrap=document.getElementById("legend");
+  Object.entries(BRANCHES).forEach(([k,b])=>{
+    if(k==="core") return;
+    const el=document.createElement("div");
+    el.className="lg";
+    el.innerHTML=`<span class="dot" style="background:${b.css}"></span>${b.name}`;
+    el.onclick=()=>{
+      if(HIDDEN.has(k)){HIDDEN.delete(k);el.classList.remove("off");}
+      else{HIDDEN.add(k);el.classList.add("off");}
+      NODES.forEach(n=>{ if(n.branch===k && elById[n.id]) elById[n.id].style.display=HIDDEN.has(k)?"none":""; });
+      document.querySelectorAll("#lines line").forEach(l=>{});
+    };
+    wrap.appendChild(el);
+  });
+}
+
+/* ---------- panel de detalle ---------- */
+const scrim=document.getElementById("scrim");
+const sheet=document.getElementById("sheet");
+let CUR=null;
+
+function timeChip(t){ return t?`<span>⏱ <b>${t}</b></span>`:""; }
+
+function open(n){
+  CUR=n;
+  const b=BRANCHES[n.branch];
+  sheet.style.setProperty("--bcol",b.css);
+  document.documentElement.style.setProperty("--bcol",b.css);
+  document.getElementById("sEyebrow").textContent=b.name+(n.tier===0?"":n.tier===1?" · rama mayor":" · habilidad");
+  document.getElementById("sTitle").textContent=n.title;
+
+  const st=status(n);
+  const stTxt=st==="done"?"✓ Dominado":st==="practicing"?"◐ En práctica":st==="available"?"● Por empezar":"🔒 Bloqueado";
+  document.getElementById("sMeta").innerHTML=
+    timeChip(n.time)+`<span>${stTxt}</span>`+
+    (n.branch!=="core"?`<span style="color:${b.css}">${b.name}</span>`:"");
+
+  let html="";
+
+  // aviso de prerequisitos
+  if(st==="locked"){
+    const faltan=n.need.filter(p=>!DONE.has(p)).map(p=>byId[p]?byId[p].title:p);
+    html+=`<div class="block"><div class="gate">Para inspeccionar a fondo y desbloquear esto primero necesitas completar: <b>${faltan.join(" · ")}</b>. Retrocede y trabaja esos nodos.</div></div>`;
+  }
+
+  // barra de constancia (si requiere práctica y está en práctica o disponible)
+  if(requiresPractice(n) && st!=="locked" && st!=="done"){
+    const pd=practiceDays(n), req=requiredDays(n);
+    const pct=Math.min(100,pd/req*100);
+    const last=PRAC[n.id]?daysAgo(PRAC[n.id].lastTouch):null;
+    let warn="";
+    if(st==="practicing" && last!==null && last>=4){
+      warn=`<div class="prac-warn">Llevas <b>${last} días</b> sin registrar su hábito. ¿Lo dejaste ir? Retómalo o sé honesto y déjalo en pausa.</div>`;
+    }
+    html+=`<div class="block"><div class="prac-card">
+      <div class="prac-top"><span>Constancia real</span><span id="pracLab">${pd} de ${req} días de práctica real</span></div>
+      <div class="prac-bar"><div class="prac-fill" id="pracFill" style="width:${pct}%"></div></div>
+      <div class="prac-note">Este nodo no se marca con un clic. Solo cuenta como dominado cuando sostienes su hábito ${req} días reales y pasas un chequeo de honestidad. Así sabes que de verdad lo vives.</div>
+      ${warn}
+    </div></div>`;
+  }
+
+  // POR QUÉ
+  html+=`<div class="block"><div class="blab">Por qué se hace</div><div class="why">${n.why}</div></div>`;
+
+  // RESPALDO CIENTÍFICO
+  if(n.evidence){
+    let ev=`<div class="evidence">${n.evidence}`;
+    if(n.study){ ev+=`<a class="studylink" href="${n.study.u}" target="_blank" rel="noopener">📄 Leer el estudio: ${n.study.t} →</a>`; }
+    ev+=`</div>`;
+    html+=`<div class="block"><div class="blab">Según la ciencia</div>${ev}</div>`;
+  }
+
+  // PASOS
+  if(n.steps&&n.steps.length){
+    html+=`<div class="block"><div class="blab">Cómo desarrollarla</div><div class="stepwrap">`;
+    n.steps.forEach((s,i)=>{html+=`<div class="step"><span class="n">${i+1}</span><span>${s}</span></div>`;});
+    html+=`</div></div>`;
+  }
+
+  // TIPS
+  if(n.tips&&n.tips.length){
+    html+=`<div class="block"><div class="blab">Tips clave</div><ul class="list">`;
+    n.tips.forEach(t=>html+=`<li>${t}</li>`);
+    html+=`</ul></div>`;
+  }
+
+  // PARADIGMAS
+  if(n.paradigms&&n.paradigms.length){
+    html+=`<div class="block"><div class="blab">Paradigmas a romper</div><ul class="list">`;
+    n.paradigms.forEach(p=>html+=`<li class="para">${p}</li>`);
+    html+=`</ul></div>`;
+  }
+
+  // HÁBITOS
+  if(n.habits&&n.habits.length){
+    html+=`<div class="block"><div class="blab">Hábitos para rastrear</div><div class="habits" id="habZone">`;
+    n.habits.forEach((h,i)=>{
+      const rec=HAB[h]||{count:0,last:null};
+      const onToday=rec.last===todayKey();
+      html+=`<div class="habit ${onToday?'hon':''}" data-h="${encodeURIComponent(h)}">
+        <div class="hx">${onToday?'✓':''}</div><span>${h}</span>
+        <span class="streak">${rec.count>0?rec.count+' días ✓':'sin marcar'}</span></div>`;
+    });
+    html+=`</div></div>`;
+  }
+
+  // NOTAS
+  html+=`<div class="block"><div class="blab">Mis notas y registros</div>
+    <textarea class="notebox" id="noteBox" placeholder="Anota tu progreso, reflexiones o lo que vas logrando aquí...">${NOTES[n.id]||""}</textarea></div>`;
+
+  // ENLACES
+  if(n.links&&n.links.length){
+    html+=`<div class="block"><div class="blab">Enlaces de ayuda</div><div class="links">`;
+    n.links.forEach(l=>html+=`<a href="${l.u}" target="_blank" rel="noopener">${l.t} ↗</a>`);
+    html+=`</div></div>`;
+  }
+
+  document.getElementById("sBody").innerHTML=html;
+
+  // footer
+  const foot=document.getElementById("sFoot");
+  const needsPrac=requiresPractice(n);
+  if(st==="locked"){
+    foot.innerHTML=`<button class="cta disabled">🔒 Completa los requisitos para marcar</button>`;
+  }else if(st==="done"){
+    foot.innerHTML=`<button class="cta undo" id="ctaBtn">Ya no lo mantengo — desmarcar</button>`;
+    document.getElementById("ctaBtn").onclick=()=>undoDone(n);
+  }else if(!needsPrac){
+    // nodo conceptual / raíz: marcar directo
+    foot.innerHTML=`<button class="cta" id="ctaBtn">✓ Marcar como hecho</button>`;
+    document.getElementById("ctaBtn").onclick=()=>{ markDone(n); open(n); };
+  }else if(st==="available"){
+    foot.innerHTML=`<button class="cta" id="ctaBtn">Empezar a practicar</button>`;
+    document.getElementById("ctaBtn").onclick=()=>startPractice(n);
+  }else{ // practicing
+    const pd=practiceDays(n), req=requiredDays(n), ready=pd>=req;
+    foot.innerHTML=`<button class="cta ${ready?'':'disabled'}" id="ctaBtn">${ready?'✓ Validar y marcar como dominado':'Sigue practicando ('+pd+'/'+req+' días)'}</button>`;
+    document.getElementById("ctaBtn").onclick=()=>{ if(ready) attemptDone(n); else toast(`Te faltan ${req-pd} días de práctica real`); };
+  }
+
+  // wire hábitos
+  document.querySelectorAll("#habZone .habit").forEach(el=>{
+    el.querySelector(".hx").onclick=()=>toggleHabit(decodeURIComponent(el.dataset.h),el);
+  });
+  // wire nota
+  const nb=document.getElementById("noteBox");
+  if(nb){
+    let t;
+    nb.oninput=()=>{ clearTimeout(t); t=setTimeout(()=>{ NOTES[n.id]=nb.value; saveNote(); },400); };
+  }
+
+  scrim.classList.add("on"); sheet.classList.add("on");
+}
+
+function close(){ scrim.classList.remove("on"); sheet.classList.remove("on"); CUR=null; }
+scrim.onclick=close;
+
+/* ---------- rutas guiadas ---------- */
+let ACTIVE_PATH=null;            // ids del camino activo (para resaltar)
+function pathNextNode(seq){
+  // primer nodo de la secuencia que no esté hecho y sea alcanzable o no
+  const uniq=[...new Set(seq)];
+  for(const id of uniq){ if(!DONE.has(id)) return id; }
+  return null;
+}
+function pathProgress(seq){
+  const uniq=[...new Set(seq)];
+  const done=uniq.filter(id=>DONE.has(id)).length;
+  return {done,total:uniq.length};
+}
+function followPath(p){
+  ACTIVE_PATH=[...new Set(p.seq)];
+  // marcar nodos del camino visualmente
+  NODES.forEach(n=>{ const el=elById[n.id]; if(el) el.classList.toggle("onpath",ACTIVE_PATH.includes(n.id)); });
+  const next=pathNextNode(p.seq);
+  close();
+  if(next){
+    const n=byId[next];
+    centerOn(n.x,n.y,.9);
+    setTimeout(()=>{ open(n); },420);
+    toast(`Ruta: ${p.name} → ${n.title}`);
+  }else{
+    toast(`¡Ruta "${p.name}" completada! ✦`);
+  }
+}
+function clearPath(){
+  ACTIVE_PATH=null;
+  NODES.forEach(n=>{ const el=elById[n.id]; if(el) el.classList.remove("onpath"); });
+}
+
+/* ---------- panel de resumen ---------- */
+function branchStats(){
+  const stats={};
+  Object.keys(BRANCHES).forEach(k=>{ if(k!=="core") stats[k]={done:0,total:0}; });
+  NODES.forEach(n=>{
+    if(n.branch==="core"||!stats[n.branch]) return;
+    stats[n.branch].total++;
+    if(DONE.has(n.id)) stats[n.branch].done++;
+  });
+  return stats;
+}
+function openSummary(){
+  CUR=null;
+  sheet.style.setProperty("--bcol",BRANCHES.core.css);
+  document.getElementById("sEyebrow").textContent="TU PROGRESO";
+  document.getElementById("sTitle").textContent="Resumen de la senda";
+  const {lvl,done}=levelInfo();
+  document.getElementById("sMeta").innerHTML=`<span>Nivel <b>${lvl}</b></span><span>${done} de ${NODES.length} nodos</span>`;
+
+  const stats=branchStats();
+  const arr=Object.entries(stats).map(([k,v])=>({k,name:BRANCHES[k].name,css:BRANCHES[k].css,
+    done:v.done,total:v.total,pct:v.total?v.done/v.total:0}));
+  // rama más fuerte y más débil (entre las que ya empezaste, débil = menor pct con algo de avance o empezable)
+  const sorted=[...arr].sort((a,b)=>b.pct-a.pct);
+  const strong=sorted[0];
+  const weak=[...arr].sort((a,b)=>a.pct-b.pct)[0];
+
+  let html="";
+
+  // TU VERDADERO NORTE — reencuadre honesto de la meta
+  const mastered=NODES.filter(n=>DONE.has(n.id)&&n.tier>0).length;
+  const practicingN=NODES.filter(n=>PRAC[n.id]).length;
+  let norteMsg;
+  if(done<=1){
+    norteMsg="No estás aquí para ser mejor que el 99% de la gente. Esa meta se desinfla el primer día malo. Estás aquí para ser mejor que tú de ayer — la única comparación que nunca te traiciona, porque depende solo de ti.";
+  }else if(mastered<5){
+    norteMsg=`Ya dominas ${mastered} ${mastered===1?"hábito":"hábitos"} que antes no. Eso no se mide contra los demás: o lo vives o no, y tú ya lo estás viviendo. Sigue por constancia, no por llegar a un número.`;
+  }else if(mastered<15){
+    norteMsg=`${mastered} dominios ya son parte de ti. No te compares con un '1%' inventado: compárate con quien eras cuando abriste esto por primera vez. Esa distancia es real y es tuya.`;
+  }else{
+    norteMsg=`Has integrado ${mastered} dominios de forma sostenida. A estas alturas ya sabes la verdad: esto nunca fue sobre superar a otros, sino sobre quién te has vuelto. Eso no tiene techo ni ranking.`;
+  }
+  html+=`<div class="norte">
+    <div class="norte-lab">Tu verdadero norte</div>
+    <div class="norte-msg">${norteMsg}</div>
+  </div>`;
+
+  html+=`<div class="sumhead">Aquí ves cómo se reparte tu desarrollo entre las diez ramas. Equilibrar al hombre completo es trabajar también lo que evitas, no solo lo que se te da bien.</div>`;
+
+  if(done>0){
+    html+=`<div class="verdict">
+      <div class="vcard strong"><div class="vlab">Tu rama más fuerte</div><div class="vname" style="color:${strong.css}">${strong.name}</div><div class="bp" style="margin-top:4px;color:var(--muted)">${Math.round(strong.pct*100)}% completada</div></div>
+      <div class="vcard weak"><div class="vlab">Tu rama a reforzar</div><div class="vname" style="color:${weak.css}">${weak.name}</div><div class="bp" style="margin-top:4px;color:var(--muted)">${Math.round(weak.pct*100)}% completada</div></div>
+    </div>`;
+  }else{
+    html+=`<div class="sumhead" style="color:var(--gold)">Aún no has marcado ningún nodo. Empieza por <b>Tú, ahora</b> en el centro y elige tu primera rama.</div>`;
+  }
+
+  // DETECTOR DE ABANDONO
+  const practicing=NODES.filter(n=>PRAC[n.id]);
+  const stale=practicing.map(n=>({n,last:daysAgo(PRAC[n.id].lastTouch)}))
+                        .filter(o=>o.last>=4).sort((a,b)=>b.last-a.last);
+  const active=practicing.filter(n=>daysAgo(PRAC[n.id].lastTouch)<4);
+  if(practicing.length>0){
+    html+=`<div class="block"><div class="blab">Lo que tienes entre manos</div>`;
+    if(active.length){
+      html+=`<div class="alive">✓ Vivos y activos: ${active.map(n=>n.title).join(", ")}.</div>`;
+    }
+    if(stale.length){
+      html+=`<div class="sumhead" style="margin:10px 0 9px">Esto lo empezaste pero lo estás dejando ir. No para culparte — solo para que lo veas:</div>`;
+      stale.forEach(o=>{
+        const pd=practiceDays(o.n), req=requiredDays(o.n);
+        html+=`<div class="stale" data-stale="${o.n.id}">
+          <div class="st-l"><div class="st-name">${o.n.title}</div>
+            <div class="st-meta">${o.last} días sin tocarlo · ${pd}/${req} días de práctica</div></div>
+          <div class="st-go" data-goto="${o.n.id}">Retomar ›</div>
+        </div>`;
+      });
+    }
+    html+=`</div>`;
+  }
+
+  html+=`<div class="block"><div class="blab">Progreso por rama</div>`;
+  arr.sort((a,b)=>b.pct-a.pct).forEach(r=>{
+    html+=`<div class="branchrow">
+      <div class="brtop"><span class="bn"><span class="dot" style="background:${r.css}"></span>${r.name}</span>
+        <span class="bp">${r.done}/${r.total}</span></div>
+      <div class="brbar"><div class="fill" style="width:${r.pct*100}%;background:${r.css}"></div></div>
+    </div>`;
+  });
+  html+=`</div>`;
+
+  // RUTAS GUIADAS
+  html+=`<div class="block"><div class="blab">Rutas guiadas · por dónde seguir</div>
+    <div class="sumhead" style="margin-bottom:14px">No tienes que abarcarlo todo a la vez. Elige un camino y síguelo paso a paso; al tocar "Seguir" te llevo al próximo nodo pendiente.</div>
+    <div class="paths">`;
+  PATHS.forEach(p=>{
+    const pr=pathProgress(p.seq);
+    const pct=Math.round(pr.done/pr.total*100);
+    const next=pathNextNode(p.seq);
+    const nextName=next?byId[next].title:"¡Completada!";
+    html+=`<div class="pathcard" data-path="${p.id}">
+      <div class="pc-ico">${p.icon}</div>
+      <div class="pc-body">
+        <div class="pc-name">${p.name}</div>
+        <div class="pc-desc">${p.desc}</div>
+        <div class="pc-bar"><div class="pc-fill" style="width:${pct}%"></div></div>
+        <div class="pc-next">${pr.done}/${pr.total} · siguiente: <b>${nextName}</b></div>
+      </div>
+      <div class="pc-go" data-go="${p.id}">${next?"Seguir ›":"✓"}</div>
+    </div>`;
+  });
+  html+=`</div></div>`;
+
+  document.getElementById("sBody").innerHTML=html;
+  document.getElementById("sFoot").innerHTML=`<button class="cta" id="ctaBtn" style="background:var(--gold)">Seguir construyendo</button>`;
+  document.getElementById("ctaBtn").onclick=close;
+
+  // wire rutas
+  document.querySelectorAll(".pc-go").forEach(el=>{
+    el.onclick=(e)=>{ e.stopPropagation(); const p=PATHS.find(x=>x.id===el.dataset.go); if(p) followPath(p); };
+  });
+  // wire retomar (detector de abandono)
+  document.querySelectorAll(".st-go").forEach(el=>{
+    el.onclick=(e)=>{ e.stopPropagation(); const n=byId[el.dataset.goto]; if(n){ close(); centerOn(n.x,n.y,.95); setTimeout(()=>open(n),420); } };
+  });
+
+  scrim.classList.add("on"); sheet.classList.add("on");
+}
+document.getElementById("summary").onclick=openSummary;
+
+/* ---------- empezar práctica / dominar / retroceder ---------- */
+function startPractice(n){
+  PRAC[n.id]={started:todayKey(), lastTouch:todayKey()};
+  savePrac(); refreshAll(); open(n);
+  toast(`Empezaste a practicar: ${n.title}`);
+}
+function abandonPractice(n){
+  delete PRAC[n.id]; savePrac(); refreshAll(); open(n);
+}
+function markDone(n){
+  const prev=levelInfo().lvl;
+  DONE.add(n.id); delete PRAC[n.id];
+  const now=levelInfo().lvl;
+  saveDone(); savePrac(); refreshAll();
+  if(now>prev) toast(`¡Subiste a NIVEL ${now}! ⬆`);
+  else toast(`Dominado: ${n.title} ✓`);
+}
+function undoDone(n){
+  DONE.delete(n.id);
+  saveDone(); refreshAll(); open(n);
+}
+
+// intento de marcar dominado: si requiere práctica, validar constancia + check honesto
+function attemptDone(n){
+  if(!requiresPractice(n)){ markDone(n); open(n); return; }
+  const pd=practiceDays(n), req=requiredDays(n);
+  if(pd<req){
+    // no tiene la constancia: ofrecer continuar practicando
+    toast(`Te faltan ${req-pd} días de práctica real`);
+    open(n);
+    return;
+  }
+  openCheck(n);   // tiene constancia → check honesto
+}
+
+const _unusedToggleDone=null;
+
+function toggleHabit(h,el){
+  const rec=HAB[h]||{count:0,last:null,days:[]};
+  if(!rec.days) rec.days=[];
+  const tk=todayKey();
+  if(rec.last===tk){
+    rec.last=rec.days.length>1?rec.days[rec.days.length-2]:null;
+    rec.count=Math.max(0,rec.count-1);
+    rec.days=rec.days.filter(d=>d!==tk);
+    if(el){el.classList.remove("hon"); el.querySelector(".hx").textContent="";}
+  }else{
+    rec.last=tk; rec.count+=1;
+    if(!rec.days.includes(tk)) rec.days.push(tk);
+    if(el){el.classList.add("hon"); el.querySelector(".hx").textContent="✓";}
+  }
+  if(el) el.querySelector(".streak").textContent=rec.count>0?rec.count+" días ✓":"sin marcar";
+  HAB[h]=rec; saveHab();
+  NODES.forEach(n=>{ if(PRAC[n.id]&&n.habits&&n.habits.includes(h)){ PRAC[n.id].lastTouch=tk; } });
+  savePrac();
+  if(CUR && CUR.habits && CUR.habits.includes(h)) refreshPracticeBar(CUR);
+}
+function refreshPracticeBar(n){
+  const bar=document.getElementById("pracFill");
+  const lab=document.getElementById("pracLab");
+  if(!bar) return;
+  const pd=practiceDays(n), req=requiredDays(n);
+  bar.style.width=Math.min(100,pd/req*100)+"%";
+  if(lab) lab.textContent=`${pd} de ${req} días de práctica real`;
+  const cta=document.getElementById("ctaBtn");
+  if(cta && pd>=req && cta.classList.contains("disabled")){
+    cta.classList.remove("disabled"); cta.textContent="✓ Validar y marcar como dominado";
+  }
+}
+
+/* ---------- check honesto ---------- */
+const checkScrim=document.getElementById("checkScrim");
+const checkBox=document.getElementById("checkBox");
+let CK_NODE=null, CK_ANS={};
+
+function honestyQuestions(n){
+  // preguntas de PRÁCTICA real, no de conocimiento
+  const qs=[
+    {id:"freq", q:"En las últimas 2 semanas, ¿con qué constancia hiciste lo que pide este nodo?",
+     opts:[["casi_diario","Casi a diario, sin saltarme",2],["varias","Varias veces por semana",1],
+           ["pocas","Solo unas pocas veces",0],["nada","Casi nada, lo dejé pasar",-1]]},
+    {id:"real", q:"¿Puedes recordar un momento concreto y real en que lo aplicaste?",
+     opts:[["si_claro","Sí, claramente, podría contarlo",2],["mas_o_menos","Algo, pero vago",0],
+           ["no","No, la verdad no",-1]]},
+    {id:"honest", q:"Sé sincero contigo: ¿esto ya es parte de ti o lo estás marcando para avanzar?",
+     opts:[["parte","Ya es un hábito, sale casi solo",2],["camino","En camino, aún me cuesta",1],
+           ["forzando","Lo estoy forzando para marcarlo",-1]]},
+  ];
+  return qs;
+}
+function openCheck(n){
+  CK_NODE=n; CK_ANS={};
+  document.getElementById("ckTitle").textContent=`¿Dominas "${n.title}"?`;
+  document.getElementById("ckSub").textContent="Responde con sinceridad. Esto es solo para ti — nadie lo ve. Mentirte aquí solo te roba a ti mismo.";
+  const qs=honestyQuestions(n);
+  let html="";
+  qs.forEach(q=>{
+    html+=`<div class="ckq" data-q="${q.id}"><div class="ckq-q">${q.q}</div><div class="ckq-opts">`;
+    q.opts.forEach(o=>{ html+=`<div class="ckopt" data-val="${o[2]}" data-key="${o[0]}">${o[1]}</div>`; });
+    html+=`</div></div>`;
+  });
+  document.getElementById("ckBody").innerHTML=html;
+  document.getElementById("ckFoot").innerHTML=
+    `<button class="ckbtn cancel" id="ckCancel">Aún no</button>
+     <button class="ckbtn go" id="ckSubmit">Confirmar con honestidad</button>`;
+
+  document.querySelectorAll("#ckBody .ckq").forEach(qz=>{
+    qz.querySelectorAll(".ckopt").forEach(op=>{
+      op.onclick=()=>{
+        qz.querySelectorAll(".ckopt").forEach(x=>x.classList.remove("sel"));
+        op.classList.add("sel");
+        CK_ANS[qz.dataset.q]={val:+op.dataset.val,key:op.dataset.key};
+      };
+    });
+  });
+  document.getElementById("ckCancel").onclick=closeCheck;
+  document.getElementById("ckSubmit").onclick=submitCheck;
+  checkScrim.classList.add("on"); checkBox.classList.add("on");
+}
+function closeCheck(){ checkScrim.classList.remove("on"); checkBox.classList.remove("on"); CK_NODE=null; }
+function submitCheck(){
+  const qs=honestyQuestions(CK_NODE);
+  if(Object.keys(CK_ANS).length<qs.length){ toast("Responde las tres con sinceridad"); return; }
+  let score=0, anyNeg=false;
+  Object.values(CK_ANS).forEach(a=>{ score+=a.val; if(a.val<0) anyNeg=true; });
+  CHECKS[CK_NODE.id]={answers:CK_ANS,date:todayKey(),score};
+  saveChk();
+  const n=CK_NODE;
+  // criterio: score>=4 y ninguna respuesta abiertamente negativa
+  const pass=(score>=4 && !anyNeg);
+  const foot=document.getElementById("ckFoot");
+  const body=document.getElementById("ckBody");
+  if(pass){
+    body.innerHTML=`<div class="ck-verdict pass">Se nota que esto ya es tuyo. No lo marcaste por avanzar, lo viviste. Eso es exactamente de lo que se trata. Queda registrado como <b>dominado</b>.</div>`;
+    foot.innerHTML=`<button class="ckbtn go" id="ckDone">Marcar como dominado ✓</button>`;
+    document.getElementById("ckDone").onclick=()=>{ closeCheck(); markDone(n); open(n); };
+  }else{
+    body.innerHTML=`<div class="ck-verdict fail">Tus respuestas dicen que esto todavía no está asentado — y reconocerlo es lo más valioso que puedes hacer. No es un fracaso: es honestidad. Sigue practicándolo unos días más y vuelve cuando de verdad sea parte de ti. Nadie gana saltándose esto, y menos tú.</div>`;
+    foot.innerHTML=`<button class="ckbtn cancel" id="ckBack">Lo sigo practicando</button>`;
+    document.getElementById("ckBack").onclick=()=>{ closeCheck(); open(n); };
+  }
+}
+
+/* ============================================================
+   MÓDULO: Dominio de uno mismo (dejar vicios)
+   Mecánica basada en prevención de recaídas (Marlatt):
+   - racha de días limpios + mejor marca; la recaída NO borra el historial
+   - urge surfing para el momento del antojo
+   - registro de detonantes para ver patrones
+   - el 'por qué' siempre presente
+   ============================================================ */
+const KEY_VICE="senda_vice";
+let VICE={};  // {viceId:{clean:[fechas], relapses:[{date,trigger,note}], best:n, why:str, active:bool}}
+
+async function loadVice(){
+  try{ const v=await storeGet(KEY_VICE); if(v) VICE=JSON.parse(v); }catch(e){}
+}
+const saveVice=()=>save(KEY_VICE,VICE);
+
+function viceRec(id){
+  if(!VICE[id]){
+    const def=VICE_DEFS.find(v=>v.id===id)||{};
+    VICE[id]={clean:[], relapses:[], best:0, why:def.why_default||"", active:true};
+  }
+  if(!VICE[id].clean) VICE[id].clean=[];
+  if(!VICE[id].relapses) VICE[id].relapses=[];
+  return VICE[id];
+}
+// racha actual = días consecutivos limpios contando desde el último día limpio hacia atrás,
+// sin que haya una recaída más reciente
+function currentStreak(id){
+  const r=viceRec(id);
+  // fecha de la última recaída (o null)
+  const lastRelapse=r.relapses.length? r.relapses[r.relapses.length-1].date : null;
+  // días limpios posteriores a la última recaída
+  let validDays=r.clean.filter(d=> !lastRelapse || daysBetween(lastRelapse,d)>0 );
+  if(validDays.length===0) return {days:0, since:lastRelapse};
+  // contar racha consecutiva hasta hoy (tolera que hoy aún no esté marcado)
+  const set=new Set(validDays);
+  let streak=0, cur=todayKey();
+  // si hoy no está marcado, empezar desde ayer
+  if(!set.has(cur)){ const y=new Date(); y.setDate(y.getDate()-1); cur=y.getFullYear()+"-"+(y.getMonth()+1)+"-"+y.getDate(); }
+  while(set.has(cur)){
+    streak++;
+    const d=keyToDate(cur); d.setDate(d.getDate()-1);
+    cur=d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
+  }
+  return {days:streak, since:lastRelapse};
+}
+function markCleanDay(id){
+  const r=viceRec(id); const tk=todayKey();
+  if(!r.clean.includes(tk)) r.clean.push(tk);
+  const st=currentStreak(id).days;
+  if(st>r.best) r.best=st;
+  saveVice();
+}
+function logRelapse(id,trigger,note){
+  const r=viceRec(id);
+  r.relapses.push({date:todayKey(),trigger:trigger||"",note:note||""});
+  saveVice();
+}
+function triggerCounts(id){
+  const r=viceRec(id); const c={};
+  r.relapses.forEach(x=>{ if(x.trigger){ c[x.trigger]=(c[x.trigger]||0)+1; } });
+  return Object.entries(c).sort((a,b)=>b[1]-a[1]);
+}
+
+/* ---- panel principal del módulo (en el sheet) ---- */
+let CUR_VICE=null;
+function openVice(){
+  const id=VICE_DEFS[0].id;   // por ahora un vicio (lujuría); estructura lista para más
+  CUR_VICE=id; CUR=null;
+  const def=VICE_DEFS.find(v=>v.id===id);
+  const r=viceRec(id);
+  const {days,since}=currentStreak(id);
+  sheet.style.setProperty("--bcol","#d6a93f");
+  document.getElementById("sEyebrow").textContent="DOMINIO DE UNO MISMO";
+  document.getElementById("sTitle").textContent=def.name;
+  document.getElementById("sMeta").innerHTML=`<span>Mejor marca: <b>${r.best} días</b></span><span>${r.relapses.length} recaídas registradas</span>`;
+
+  let html="";
+  // contador grande
+  const markedToday=r.clean.includes(todayKey());
+  html+=`<div class="vice-counter">
+    <div class="vc-num">${days}</div>
+    <div class="vc-lab">${days===1?"día limpio":"días limpios"}${r.best>0?` · récord ${r.best}`:""}</div>
+  </div>`;
+
+  // botón día limpio
+  if(markedToday){
+    html+=`<div class="vice-today done">✓ Hoy ya lo registraste como día limpio. Bien.</div>`;
+  }else{
+    html+=`<button class="vice-clean" id="viceClean">✓ Hoy fue un día limpio</button>`;
+  }
+
+  // SOS
+  html+=`<button class="vice-sos" id="viceSos">Tengo el impulso ahora — ayúdame</button>`;
+
+  // por qué
+  html+=`<div class="block"><div class="blab">Mi porqué</div>
+    <textarea class="notebox" id="viceWhy" placeholder="¿Por qué quiero dominar esto?">${r.why||""}</textarea></div>`;
+
+  // detonantes / patrones
+  const tc=triggerCounts(id);
+  if(tc.length){
+    html+=`<div class="block"><div class="blab">Tus detonantes · patrones</div><div class="trigs">`;
+    const max=tc[0][1];
+    tc.forEach(([t,n])=>{
+      html+=`<div class="trigrow"><span class="tg-n">${t}</span>
+        <span class="tg-bar"><span class="tg-fill" style="width:${n/max*100}%"></span></span>
+        <span class="tg-c">${n}</span></div>`;
+    });
+    html+=`</div><div class="trig-note">Reconocer qué lo dispara es la mitad del trabajo. Cuando sientas venir uno de estos, es tu señal para activar el plan, no para pelear con la mente.</div></div>`;
+  }
+
+  // registrar recaída (sin culpa)
+  html+=`<div class="block"><div class="blab">Si recaíste</div>
+    <div class="relapse-intro">Una recaída no borra tu progreso ni te define. Es un dato para aprender. Registrarla con honestidad es lo que rompe el ciclo de culpa.</div>
+    <button class="vice-relapse" id="viceRelapse">Registrar una recaída</button></div>`;
+
+  // historial corto
+  if(r.relapses.length){
+    html+=`<div class="block"><div class="blab">Últimos registros</div><div class="rlog">`;
+    r.relapses.slice(-4).reverse().forEach(x=>{
+      html+=`<div class="rlog-it"><b>${x.date}</b>${x.trigger?` · ${x.trigger}`:""}${x.note?`<div class="rlog-note">${x.note}</div>`:""}</div>`;
+    });
+    html+=`</div></div>`;
+  }
+
+  document.getElementById("sBody").innerHTML=html;
+  document.getElementById("sFoot").innerHTML=`<button class="cta" id="ctaBtn" style="background:#d6a93f">Cerrar</button>`;
+  document.getElementById("ctaBtn").onclick=close;
+
+  const cl=document.getElementById("viceClean"); if(cl) cl.onclick=()=>{ markCleanDay(id); openVice(); toast("Día limpio registrado ✓"); };
+  document.getElementById("viceSos").onclick=()=>{ close(); startSos(id); };
+  document.getElementById("viceRelapse").onclick=()=>openRelapse(id);
+  const wy=document.getElementById("viceWhy");
+  if(wy){ let t; wy.oninput=()=>{ clearTimeout(t); t=setTimeout(()=>{ viceRec(id).why=wy.value; saveVice(); },400); }; }
+
+  scrim.classList.add("on"); sheet.classList.add("on");
+}
+document.getElementById("vice").onclick=openVice;
+
+/* ---- registrar recaída (sin culpa) ---- */
+function openRelapse(id){
+  const def=VICE_DEFS.find(v=>v.id===id);
+  let sel=null;
+  let html=`<div class="ck-verdict" style="background:rgba(214,169,63,.08);border:1px solid rgba(214,169,63,.3);color:#e0cda0;margin-bottom:16px">Esto no es un castigo. Reconocer lo que pasó, sin dramatizarlo, es exactamente lo que te hace más fuerte la próxima vez. Respira y sé honesto.</div>`;
+  html+=`<div class="ckq"><div class="ckq-q">¿Qué lo disparó?</div><div class="ckq-opts" id="rTrigs">`;
+  def.triggers.forEach(t=>{ html+=`<div class="ckopt" data-t="${t}">${t}</div>`; });
+  html+=`</div></div>`;
+  html+=`<div class="ckq"><div class="ckq-q">¿Qué aprendes de esta vez? (opcional)</div>
+    <textarea class="cktext" id="rNote" placeholder="Qué sentías, qué situación, qué harías distinto..."></textarea></div>`;
+  document.getElementById("ckTitle").textContent="Registrar una recaída";
+  document.getElementById("ckSub").textContent="Con honestidad y sin culpa. Esto es solo para ti.";
+  document.getElementById("ckBody").innerHTML=html;
+  document.getElementById("ckFoot").innerHTML=`<button class="ckbtn cancel" id="rCancel">Cancelar</button><button class="ckbtn go" id="rSave">Guardar y seguir adelante</button>`;
+  document.querySelectorAll("#rTrigs .ckopt").forEach(op=>{
+    op.onclick=()=>{ document.querySelectorAll("#rTrigs .ckopt").forEach(x=>x.classList.remove("sel")); op.classList.add("sel"); sel=op.dataset.t; };
+  });
+  document.getElementById("rCancel").onclick=closeCheck;
+  document.getElementById("rSave").onclick=()=>{
+    logRelapse(id, sel, document.getElementById("rNote").value.trim());
+    closeCheck(); openVice();
+    toast("Registrado. Mañana es un nuevo día limpio.");
+  };
+  checkScrim.classList.add("on"); checkBox.classList.add("on");
+}
+
+/* ---- modo SOS: urge surfing ---- */
+const sosEl=document.getElementById("sos");
+const sosInner=document.getElementById("sosInner");
+let sosTimerInt=null;
+function startSos(id){
+  sosStep1(id);
+  sosEl.classList.add("on");
+}
+function endSos(){
+  if(sosTimerInt){clearInterval(sosTimerInt);sosTimerInt=null;}
+  sosEl.classList.remove("on");
+}
+function sosStep1(id){
+  if(sosTimerInt){clearInterval(sosTimerInt);sosTimerInt=null;}
+  sosInner.innerHTML=`
+    <div class="sos-step-label">Paso 1 · Respira</div>
+    <div class="breath">inhala · exhala</div>
+    <div class="sos-h">El impulso es una ola.</div>
+    <div class="sos-p">No tienes que pelear con él ni obedecerlo. Sube, llega a un pico y baja solo en unos minutos. Respira con el círculo: inhala mientras crece, exhala mientras se encoge.</div>
+    <button class="sos-btn main" id="sos1">Estoy respirando · siguiente</button>
+    <button class="sos-btn ghost" id="sosClose1">Ya pasó, salir</button>`;
+  document.getElementById("sos1").onclick=()=>sosStep2(id);
+  document.getElementById("sosClose1").onclick=endSos;
+}
+function sosStep2(id){
+  sosInner.innerHTML=`
+    <div class="sos-step-label">Paso 2 · Obsérvalo</div>
+    <div class="sos-h">¿Dónde lo sientes?</div>
+    <div class="sos-p">Nota la sensación en tu cuerpo con curiosidad, como un científico, no como enemigo. ¿Es calor, tensión, inquietud? Ponle nombre. Nombrar una sensación le quita fuerza: dejas de ser el impulso y pasas a ser quien lo observa.</div>
+    <div class="sos-quote">"No luches contra la ola ni te dejes arrastrar. Súbete a ella y déjala pasar." — técnica de urge surfing (Marlatt)</div>
+    <button class="sos-btn main" id="sos2">Lo estoy observando · siguiente</button>
+    <button class="sos-btn ghost" id="sosClose2">Ya pasó, salir</button>`;
+  document.getElementById("sos2").onclick=()=>sosStep3(id);
+  document.getElementById("sosClose2").onclick=endSos;
+}
+function sosStep3(id){
+  // temporizador de 3 minutos para dejar pasar el pico
+  let secs=180;
+  sosInner.innerHTML=`
+    <div class="sos-step-label">Paso 3 · Deja pasar el pico</div>
+    <div class="sos-timer" id="sosTimer">3:00</div>
+    <div class="sos-p">Quédate aquí mientras la ola baja. Si puedes, levántate y cambia de cuarto, toma agua, sal a caminar. El impulso casi siempre pierde fuerza antes de que este tiempo acabe.</div>
+    <button class="sos-btn main" id="sosDone">Pasó la ola — sigo limpio</button>
+    <button class="sos-btn ghost" id="sosClose3">Salir</button>`;
+  const tEl=document.getElementById("sosTimer");
+  sosTimerInt=setInterval(()=>{
+    secs--;
+    const m=Math.floor(secs/60), s=secs%60;
+    tEl.textContent=m+":"+(s<10?"0":"")+s;
+    if(secs<=0){ clearInterval(sosTimerInt); sosTimerInt=null; sosStep4(id); }
+  },1000);
+  document.getElementById("sosDone").onclick=()=>{ if(sosTimerInt){clearInterval(sosTimerInt);sosTimerInt=null;} sosStep4(id); };
+  document.getElementById("sosClose3").onclick=endSos;
+}
+function sosStep4(id){
+  if(sosTimerInt){clearInterval(sosTimerInt);sosTimerInt=null;}
+  const r=viceRec(id);
+  sosInner.innerHTML=`
+    <div class="sos-step-label">Lo lograste</div>
+    <div class="sos-h">Surfeaste la ola.</div>
+    <div class="sos-p">Acabas de demostrarte que el impulso pasa y que tú decides, no él. Cada vez que lo haces, el patrón se debilita. Esto es exactamente entrenar el músculo del autocontrol.</div>
+    ${r.why?`<div class="sos-quote">Tu porqué: ${r.why}</div>`:""}
+    <button class="sos-btn main" id="sosFinish">Volver, más fuerte</button>`;
+  document.getElementById("sosFinish").onclick=()=>{ endSos(); openVice(); };
+}
+
+/* ============================================================
+   MÓDULO: Skills aplicadas (habilidades que generan valor real)
+   - se desbloquean al alcanzar cierto nivel
+   - prueba de trabajo: registras entregables reales
+   ============================================================ */
+const KEY_SKILLS="senda_skills";
+let SK={};  // {skillId:{started:fecha, proofs:[{date,text}]}}
+
+async function loadSkills(){
+  try{ const v=await storeGet(KEY_SKILLS); if(v) SK=JSON.parse(v); }catch(e){}
+}
+const saveSkills=()=>save(KEY_SKILLS,SK);
+function skRec(id){ if(!SK[id]) SK[id]={started:null,proofs:[]}; if(!SK[id].proofs) SK[id].proofs=[]; return SK[id]; }
+function skUnlocked(s){ return levelInfo().lvl>=s.req; }
+function skStatus(s){
+  if(!skUnlocked(s)) return "locked";
+  const r=SK[s.id];
+  if(r && r.proofs && r.proofs.length>0) return "proven";   // tiene prueba de trabajo
+  if(r && r.started) return "active";
+  return "ready";
+}
+
+let CUR_SKILL=null;
+function openSkills(){
+  CUR=null; CUR_SKILL=null;
+  sheet.style.setProperty("--bcol","#7fcec2");
+  document.getElementById("sEyebrow").textContent="SKILLS APLICADAS";
+  document.getElementById("sTitle").textContent="Habilidades que generan valor";
+  const lvl=levelInfo().lvl;
+  const unlocked=SKILLS.filter(skUnlocked).length;
+  const proven=SKILLS.filter(s=>skStatus(s)==="proven").length;
+  document.getElementById("sMeta").innerHTML=`<span>Nivel <b>${lvl}</b></span><span>${unlocked}/${SKILLS.length} desbloqueadas</span><span>${proven} con prueba real</span>`;
+
+  let html=`<div class="sumhead">Estas son habilidades que se convierten en dinero y que seguirán valiendo los próximos años. Se desbloquean al subir de nivel en el árbol. Aquí no basta con leer: registras <b>prueba de trabajo real</b> — un entregable concreto — para comprobar que de verdad lo hiciste.</div>`;
+
+  // agrupar por área
+  const areas=[...new Set(SKILLS.map(s=>s.area))];
+  areas.forEach(area=>{
+    const b=BRANCHES[area];
+    const list=SKILLS.filter(s=>s.area===area);
+    html+=`<div class="sk-area"><span class="sk-dot" style="background:${b.css}"></span>${b.name}</div>`;
+    list.forEach(s=>{
+      const st=skStatus(s);
+      const r=SK[s.id];
+      const np=r&&r.proofs?r.proofs.length:0;
+      let badge="";
+      if(st==="locked") badge=`<span class="sk-badge lk">🔒 Nivel ${s.req}</span>`;
+      else if(st==="proven") badge=`<span class="sk-badge pr">✓ ${np} prueba${np>1?'s':''}</span>`;
+      else if(st==="active") badge=`<span class="sk-badge ac">En progreso</span>`;
+      else badge=`<span class="sk-badge rd">Desbloqueada</span>`;
+      html+=`<div class="sk-card ${st}" data-sk="${s.id}">
+        <div class="sk-ico" style="color:${b.css}">${s.icon}</div>
+        <div class="sk-body"><div class="sk-name">${s.name}</div>
+          <div class="sk-durable">${st==="locked"?("Sube a nivel "+s.req+" para desbloquear esta skill."):s.durable}</div></div>
+        ${badge}
+      </div>`;
+    });
+  });
+
+  document.getElementById("sBody").innerHTML=html;
+  document.getElementById("sFoot").innerHTML=`<button class="cta" id="ctaBtn" style="background:#7fcec2;color:#06120f">Cerrar</button>`;
+  document.getElementById("ctaBtn").onclick=close;
+  document.querySelectorAll(".sk-card").forEach(el=>{
+    el.onclick=()=>{ const s=SKILLS.find(x=>x.id===el.dataset.sk); if(s && skUnlocked(s)) openSkillDetail(s); else if(s) toast(`Llegas a nivel ${s.req} y se desbloquea`); };
+  });
+
+  scrim.classList.add("on"); sheet.classList.add("on");
+}
+document.getElementById("skills").onclick=openSkills;
+
+function openSkillDetail(s){
+  CUR_SKILL=s;
+  const b=BRANCHES[s.area];
+  sheet.style.setProperty("--bcol",b.css);
+  document.getElementById("sEyebrow").textContent=`SKILL · ${b.name.toUpperCase()}`;
+  document.getElementById("sTitle").textContent=s.name;
+  const r=skRec(s.id);
+  const np=r.proofs.length;
+  document.getElementById("sMeta").innerHTML=`<span>${np>0?("✓ "+np+" prueba"+(np>1?'s':'')+" registrada"+(np>1?'s':'')):"Sin prueba aún"}</span>`;
+
+  let html="";
+  html+=`<div class="block"><div class="blab">Por qué seguirá valiendo</div><div class="why">${s.durable}</div></div>`;
+  html+=`<div class="block"><div class="blab">Cómo empezar</div><div class="sk-start">${s.start}</div></div>`;
+
+  // prueba de trabajo
+  html+=`<div class="block"><div class="blab">Prueba de trabajo</div>
+    <div class="sk-proof-intro">${s.proof}</div>
+    <div class="sk-proof-input">
+      <textarea class="notebox" id="skProofText" placeholder="Pega aquí tu entregable: un link, un número, qué hiciste..."></textarea>
+      <button class="sk-proof-btn" id="skProofAdd">+ Registrar esta prueba</button>
+    </div>`;
+  if(np>0){
+    html+=`<div class="sk-proofs">`;
+    r.proofs.slice().reverse().forEach((p,i)=>{
+      html+=`<div class="sk-proof-it"><b>${p.date}</b><div class="sk-proof-tx">${p.text.replace(/</g,"&lt;")}</div></div>`;
+    });
+    html+=`</div>`;
+  }
+  html+=`</div>`;
+
+  if(s.resource){
+    html+=`<div class="block"><div class="blab">Recurso para aprender</div><div class="links"><a href="${s.resource.u}" target="_blank" rel="noopener">${s.resource.t} ↗</a></div></div>`;
+  }
+
+  document.getElementById("sBody").innerHTML=html;
+  const r2=skRec(s.id);
+  if(!r2.started){ r2.started=todayKey(); saveSkills(); }
+  document.getElementById("sFoot").innerHTML=`<button class="cta" id="ctaBtn" style="background:${b.css}">Volver a skills</button>`;
+  document.getElementById("ctaBtn").onclick=openSkills;
+  document.getElementById("skProofAdd").onclick=()=>{
+    const t=document.getElementById("skProofText").value.trim();
+    if(!t){ toast("Escribe tu entregable primero"); return; }
+    skRec(s.id).proofs.push({date:todayKey(),text:t});
+    saveSkills();
+    toast("Prueba de trabajo registrada ✓");
+    openSkillDetail(s);
+  };
+  scrim.classList.add("on"); sheet.classList.add("on");
+}
+
+/* ---------- toast ---------- */
+let tt;
+function toast(msg){
+  const el=document.getElementById("toast");
+  el.textContent=msg; el.classList.add("on");
+  clearTimeout(tt); tt=setTimeout(()=>el.classList.remove("on"),2200);
+}
+
+/* ---------- pan & zoom (touch + mouse) ---------- */
+let dragging=false,lastX=0,lastY=0,moved=0;
+let pinch=false,pinchStart=0,scaleStart=1,pmid={x:0,y:0};
+
+function dist(t){const dx=t[0].clientX-t[1].clientX,dy=t[0].clientY-t[1].clientY;return Math.hypot(dx,dy);}
+function mid(t){return{x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2};}
+
+stage.addEventListener("touchstart",e=>{
+  if(e.touches.length===2){
+    pinch=true;dragging=false;
+    pinchStart=dist(e.touches);scaleStart=SCALE;pmid=mid(e.touches);
+  }else if(e.touches.length===1){
+    dragging=true;moved=0;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;
+  }
+},{passive:true});
+
+stage.addEventListener("touchmove",e=>{
+  if(pinch&&e.touches.length===2){
+    e.preventDefault();
+    const d=dist(e.touches);
+    let ns=Math.min(MAX,Math.max(MIN,scaleStart*(d/pinchStart)));
+    // zoom hacia el punto medio
+    const wx=(pmid.x-OX)/SCALE, wy=(pmid.y-OY)/SCALE;
+    SCALE=ns;
+    OX=pmid.x-wx*SCALE; OY=pmid.y-wy*SCALE;
+    apply();
+  }else if(dragging&&e.touches.length===1){
+    const dx=e.touches[0].clientX-lastX, dy=e.touches[0].clientY-lastY;
+    OX+=dx;OY+=dy;moved+=Math.abs(dx)+Math.abs(dy);
+    lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;apply();
+  }
+},{passive:false});
+
+stage.addEventListener("touchend",e=>{
+  if(e.touches.length===0){pinch=false;dragging=false;}
+  else if(e.touches.length===1){pinch=false;dragging=true;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;}
+});
+
+// mouse
+stage.addEventListener("mousedown",e=>{dragging=true;moved=0;lastX=e.clientX;lastY=e.clientY;});
+window.addEventListener("mousemove",e=>{
+  if(!dragging)return;
+  const dx=e.clientX-lastX,dy=e.clientY-lastY;OX+=dx;OY+=dy;moved+=Math.abs(dx)+Math.abs(dy);
+  lastX=e.clientX;lastY=e.clientY;apply();
+});
+window.addEventListener("mouseup",()=>dragging=false);
+stage.addEventListener("wheel",e=>{
+  e.preventDefault();
+  const f=e.deltaY<0?1.12:0.89;
+  let ns=Math.min(MAX,Math.max(MIN,SCALE*f));
+  const wx=(e.clientX-OX)/SCALE, wy=(e.clientY-OY)/SCALE;
+  SCALE=ns;OX=e.clientX-wx*SCALE;OY=e.clientY-wy*SCALE;apply();
+},{passive:false});
+
+/* ---------- botones ---------- */
+document.getElementById("zin").onclick=()=>{zoomBtn(1.2);};
+document.getElementById("zout").onclick=()=>{zoomBtn(.83);};
+function zoomBtn(f){
+  let ns=Math.min(MAX,Math.max(MIN,SCALE*f));
+  const cx=window.innerWidth/2,cy=window.innerHeight/2;
+  const wx=(cx-OX)/SCALE,wy=(cy-OY)/SCALE;
+  SCALE=ns;OX=cx-wx*SCALE;OY=cy-wy*SCALE;apply();
+}
+document.getElementById("recenter").onclick=()=>centerOn(0,0,.58);
+
+/* ---------- intro ---------- */
+document.getElementById("introGo").onclick=()=>{
+  const i=document.getElementById("intro");
+  i.style.opacity="0"; setTimeout(()=>i.style.display="none",600);
+  const h=document.getElementById("hint");
+  h.style.opacity="1"; setTimeout(()=>h.style.opacity="0",3200);
+};
+
+/* ---------- arranque ---------- */
+async function start(){
+  await loadState();
+  await loadVice();
+  await loadSkills();
+  build();
+  buildLegend();
+  centerOn(0,0,.58);
+  renderLevel();
+}
+start();
+
+})();
+
+</script>
