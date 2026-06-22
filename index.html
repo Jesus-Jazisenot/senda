@@ -211,6 +211,51 @@
   .habit .streak{margin-left:auto;font-size:10px;color:var(--muted);white-space:nowrap}
   .notebox{width:100%;background:#0e1218;border:1px solid var(--line);border-radius:11px;
     color:var(--ink);padding:11px;font-family:inherit;font-size:13px;resize:vertical;min-height:60px}
+
+  /* bitácora / diario */
+  .jr-intro{font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:12px}
+  .jr-spark{background:#0e1218;border:1px solid var(--line);border-radius:11px;padding:11px 12px;margin-bottom:12px}
+  .jr-spark-head{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);
+    letter-spacing:.04em;margin-bottom:7px}
+  .jr-spark-svg{width:100%;height:46px;display:block}
+  .jr-new{background:#0e1218;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:14px}
+  .jr-new .notebox{background:#11161e;margin-bottom:10px}
+  .jr-score-row{margin-bottom:11px}
+  .jr-score-lbl{font-size:11.5px;color:var(--muted);display:block;margin-bottom:7px}
+  .jr-score{display:flex;gap:4px}
+  .jr-dot{flex:1;padding:8px 0;border-radius:7px;background:#11161e;border:1px solid var(--line);
+    color:#54585f;font-family:inherit;font-size:11px;cursor:pointer;transition:.12s}
+  .jr-dot.on{background:rgba(201,168,74,.18);border-color:var(--gold);color:var(--gold)}
+  .jr-dot:active{transform:scale(.94)}
+  .jr-add{width:100%;border:none;border-radius:10px;padding:12px;background:var(--gold);color:#0a0c10;
+    font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+  .jr-add:active{transform:scale(.99)}
+  .jr-list{display:flex;flex-direction:column;gap:9px}
+  .jr-entry{background:#0e1218;border:1px solid var(--line);border-radius:11px;padding:11px 13px;
+    border-left:2px solid var(--bcol)}
+  .jr-meta{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+  .jr-date{font-size:10.5px;color:var(--gold);letter-spacing:.04em}
+  .jr-badge{font-size:9.5px;background:rgba(201,168,74,.14);color:var(--gold);
+    padding:2px 7px;border-radius:20px}
+  .jr-txt{font-size:13px;color:#d2cab4;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+  .jr-empty{font-size:12px;color:var(--muted);font-style:italic;line-height:1.5;
+    background:#0e1218;border:1px dashed var(--line);border-radius:11px;padding:13px}
+
+  /* acción concreta de hoy */
+  .today-action{background:linear-gradient(135deg,rgba(201,168,74,.12),rgba(201,168,74,.03));
+    border:1px solid rgba(201,168,74,.3);border-radius:13px;padding:14px}
+  .ta-lbl{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+  .ta-txt{font-size:15px;color:#ece3cc;line-height:1.5;font-weight:500}
+  .ta-hint{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:9px}
+
+  /* respaldo */
+  .bk-intro{font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:12px}
+  .bk-row{display:flex;gap:9px}
+  .bk-btn{flex:1;padding:13px 8px;border-radius:11px;font-size:12.5px;font-weight:600;
+    font-family:inherit;cursor:pointer;transition:.15s;border:1px solid var(--line)}
+  .bk-btn.dl{background:rgba(201,168,74,.1);border-color:rgba(201,168,74,.4);color:var(--gold)}
+  .bk-btn.up{background:#0e1218;color:var(--muted)}
+  .bk-btn:active{transform:scale(.98)}
   /* prereq aviso */
   .gate{font-size:12.5px;color:var(--r-poder);background:rgba(192,71,63,.08);
     border:1px solid rgba(192,71,63,.3);border-radius:11px;padding:10px 12px;line-height:1.5}
@@ -2646,12 +2691,13 @@ const NODEPLAN = {"mente": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDa
 
 /* ---------- estado persistente ---------- */
 const KEY_DONE="senda_done", KEY_HAB="senda_habits", KEY_NOTE="senda_notes",
-      KEY_PRAC="senda_practice", KEY_CHK="senda_checks";
+      KEY_PRAC="senda_practice", KEY_CHK="senda_checks", KEY_JOURNAL="senda_journal";
 let DONE=new Set();         // nodos completados (dominados)
 let HAB={};                 // {habitText: {count, last, days:[fechas]}}
-let NOTES={};               // {nodeId: texto}
+let NOTES={};               // {nodeId: texto}  (notas viejas, una sola caja)
 let PRAC={};                // {nodeId: {started: fecha, lastTouch: fecha}}  nodos en práctica
 let CHECKS={};              // {nodeId: {answers, date}}  respuestas del check honesto
+let JOURNAL={};             // {nodeId: [{date, ts, text, score}]}  bitácora fechada por nodo
 
 /* ---------- capa de persistencia universal ----------
    Dentro de Claude existe window.storage; en Vercel / celular
@@ -2680,6 +2726,7 @@ async function loadState(){
     const c=await storeGet(KEY_NOTE); if(c) NOTES=JSON.parse(c);
     const d=await storeGet(KEY_PRAC); if(d) PRAC=JSON.parse(d);
     const e=await storeGet(KEY_CHK);  if(e) CHECKS=JSON.parse(e);
+    const f=await storeGet(KEY_JOURNAL); if(f) JOURNAL=JSON.parse(f);
   }catch(e){}
 }
 async function save(key,val){
@@ -2688,8 +2735,51 @@ async function save(key,val){
 const saveDone=()=>save(KEY_DONE,[...DONE]);
 const saveHab =()=>save(KEY_HAB,HAB);
 const saveNote=()=>save(KEY_NOTE,NOTES);
+const saveJournal=()=>save(KEY_JOURNAL,JOURNAL);
 const savePrac=()=>save(KEY_PRAC,PRAC);
 const saveChk =()=>save(KEY_CHK,CHECKS);
+
+/* ============================================================
+   Respaldo: exportar e importar todo el progreso (sin servidor)
+   Genera/lee un archivo .json con todas las claves de datos.
+   ============================================================ */
+const ALL_KEYS=["senda_done","senda_habits","senda_notes","senda_practice",
+                "senda_checks","senda_journal","senda_vice","senda_skills"];
+
+async function exportProgress(){
+  const data={ _app:"SENDA", _version:1, _exported:new Date().toISOString(), data:{} };
+  for(const k of ALL_KEYS){
+    const v=await storeGet(k);
+    if(v!=null) data.data[k]=v;   // guardamos el string JSON tal cual
+  }
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  const fecha=new Date().toISOString().slice(0,10);
+  a.href=url; a.download=`senda-respaldo-${fecha}.json`;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  toast("Respaldo descargado ✓");
+}
+
+function importProgressFile(file, onDone){
+  const reader=new FileReader();
+  reader.onload=async ()=>{
+    try{
+      const parsed=JSON.parse(reader.result);
+      if(!parsed || parsed._app!=="SENDA" || !parsed.data){
+        toast("Ese archivo no es un respaldo de SENDA"); return;
+      }
+      for(const k of ALL_KEYS){
+        if(parsed.data[k]!=null){ await storeSet(k, parsed.data[k]); }
+      }
+      toast("Progreso restaurado ✓");
+      if(onDone) onDone();
+    }catch(e){ toast("No se pudo leer el archivo"); }
+  };
+  reader.readAsText(file);
+}
+
 
 /* ---------- utilidades de fecha ---------- */
 const DAY=86400000;
@@ -3035,6 +3125,21 @@ function open(n){
   // POR QUÉ
   html+=`<div class="block"><div class="blab">Por qué se hace</div><div class="why">${n.why}</div></div>`;
 
+  // TU ACCIÓN DE HOY (concreta, no ambigua) — rota según el día
+  if((n.steps&&n.steps.length) || (n.habits&&n.habits.length)){
+    const pool=[].concat(n.steps||[], (n.habits||[]).map(h=>"Hoy: "+h));
+    if(pool.length){
+      // índice estable por día: cambia cada día pero es el mismo durante el día
+      const dayNum=Math.floor(Date.now()/86400000);
+      const pick=pool[dayNum % pool.length];
+      html+=`<div class="block"><div class="today-action">
+        <div class="ta-lbl">✦ Tu acción concreta de hoy</div>
+        <div class="ta-txt">${pick}</div>
+        <div class="ta-hint">No tienes que hacer todo. Haz esto hoy, regístralo abajo, y mañana habrá otra. Así "${n.title.toLowerCase()}" deja de ser abstracto.</div>
+      </div></div>`;
+    }
+  }
+
   // RESPALDO CIENTÍFICO
   if(n.evidence){
     let ev=`<div class="evidence">${n.evidence}`;
@@ -3094,9 +3199,41 @@ function open(n){
     html+=`</div>`;
   }
 
-  // NOTAS
-  html+=`<div class="block"><div class="blab">Mis notas y registros</div>
-    <textarea class="notebox" id="noteBox" placeholder="Anota tu progreso, reflexiones o lo que vas logrando aquí...">${NOTES[n.id]||""}</textarea></div>`;
+  // DIARIO / BITÁCORA del nodo (entradas fechadas que se acumulan)
+  const entries = (JOURNAL[n.id]||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+  html+=`<div class="block"><div class="blab">Bitácora · tu progreso</div>`;
+  html+=`<div class="jr-intro">Cada entrada queda con su fecha. Aquí ves tu evolución con el tiempo — lo que hace concreto algo tan abstracto como "${n.title.toLowerCase()}".</div>`;
+  // mini línea de tiempo si hay entradas con score
+  const scored = entries.filter(e=>typeof e.score==="number");
+  if(scored.length>=2){
+    html+=jrSparkline(scored.slice().reverse());
+  }
+  // nueva entrada
+  html+=`<div class="jr-new">
+    <textarea class="notebox" id="jrText" placeholder="¿Qué hiciste hoy? ¿Cómo te fue? Anótalo..."></textarea>
+    <div class="jr-score-row">
+      <span class="jr-score-lbl">¿Cómo te fue hoy?</span>
+      <div class="jr-score" id="jrScore">
+        ${[1,2,3,4,5,6,7,8,9,10].map(i=>`<button class="jr-dot" data-s="${i}">${i}</button>`).join("")}
+      </div>
+    </div>
+    <button class="jr-add" id="jrAdd">+ Guardar entrada de hoy</button>
+  </div>`;
+  // entradas pasadas
+  if(entries.length){
+    html+=`<div class="jr-list">`;
+    entries.forEach(e=>{
+      const d=new Date(e.ts||Date.now());
+      const fecha=d.toLocaleDateString("es-MX",{day:"numeric",month:"short",year:"numeric"});
+      const sc = (typeof e.score==="number")?`<span class="jr-badge">${e.score}/10</span>`:"";
+      html+=`<div class="jr-entry"><div class="jr-meta"><span class="jr-date">${fecha}</span>${sc}</div>
+        <div class="jr-txt">${(e.text||"").replace(/</g,"&lt;")}</div></div>`;
+    });
+    html+=`</div>`;
+  }else{
+    html+=`<div class="jr-empty">Aún no hay entradas. La primera es la más importante: marca dónde empiezas.</div>`;
+  }
+  html+=`</div>`;
 
   // ENLACES
   if(n.links&&n.links.length){
@@ -3148,17 +3285,70 @@ function open(n){
   document.querySelectorAll(".lt-min").forEach(btn=>{
     btn.onclick=()=>logMinutes(n, +btn.dataset.min);
   });
-  // wire nota
-  const nb=document.getElementById("noteBox");
-  if(nb){
-    let t;
-    nb.oninput=()=>{ clearTimeout(t); t=setTimeout(()=>{ NOTES[n.id]=nb.value; saveNote(); },400); };
+  // wire bitácora: selección de score
+  let jrSel=null;
+  document.querySelectorAll("#jrScore .jr-dot").forEach(d=>{
+    d.onclick=()=>{
+      document.querySelectorAll("#jrScore .jr-dot").forEach(x=>x.classList.remove("on"));
+      // marcar del 1 hasta el elegido
+      const v=+d.dataset.s; jrSel=v;
+      document.querySelectorAll("#jrScore .jr-dot").forEach(x=>{ if(+x.dataset.s<=v) x.classList.add("on"); });
+    };
+  });
+  const jrAdd=document.getElementById("jrAdd");
+  if(jrAdd){
+    jrAdd.onclick=()=>{
+      const txt=document.getElementById("jrText").value.trim();
+      if(!txt && jrSel===null){ toast("Escribe algo o marca cómo te fue"); return; }
+      addJournalEntry(n, txt, jrSel);
+    };
   }
 
   openSheetUI();
 }
 
 /* registrar minutos de práctica de hoy para un nodo */
+/* ---------- bitácora / diario por nodo ---------- */
+function addJournalEntry(n, text, score){
+  if(!JOURNAL[n.id]) JOURNAL[n.id]=[];
+  const now=new Date();
+  JOURNAL[n.id].push({
+    date: todayKey(),
+    ts: now.getTime(),
+    text: text||"",
+    score: (typeof score==="number")?score:null
+  });
+  saveJournal();
+  // si el nodo está en práctica, registrar el día también (una entrada es práctica real)
+  if(PRAC[n.id]){ PRAC[n.id].lastTouch=todayKey(); savePrac(); }
+  toast("Entrada guardada ✓");
+  open(n);
+}
+// mini línea de tiempo (sparkline SVG) de los scores en orden cronológico
+function jrSparkline(scoredAsc){
+  const n=scoredAsc.length;
+  const w=260, h=46, pad=6;
+  const max=10, min=0;
+  const pts=scoredAsc.map((e,i)=>{
+    const x=pad + (n===1?0:(i/(n-1))*(w-pad*2));
+    const y=h-pad - ((e.score-min)/(max-min))*(h-pad*2);
+    return [x,y];
+  });
+  const path=pts.map((p,i)=>(i===0?"M":"L")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
+  const dots=pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="var(--gold)"/>`).join("");
+  const first=scoredAsc[0].score, last=scoredAsc[n-1].score;
+  const delta=last-first;
+  const trend = delta>0?`▲ +${delta}`:delta<0?`▼ ${delta}`:"= igual";
+  const tcol = delta>0?"#7fc1a0":delta<0?"#e0a09a":"var(--muted)";
+  return `<div class="jr-spark">
+    <div class="jr-spark-head"><span>Tu evolución (1-10)</span><span style="color:${tcol}">${trend}</span></div>
+    <svg viewBox="0 0 ${w} ${h}" class="jr-spark-svg" preserveAspectRatio="none">
+      <path d="${path}" fill="none" stroke="var(--gold)" stroke-width="1.6" opacity=".85"/>
+      ${dots}
+    </svg>
+  </div>`;
+}
+
 function logMinutes(n, mins){
   if(!PRAC[n.id]) return;
   const tk=todayKey();
@@ -3471,6 +3661,16 @@ function openSummary(){
   });
   html+=`</div></div>`;
 
+  // RESPALDO
+  html+=`<div class="block"><div class="blab">Respaldo de tu progreso</div>
+    <div class="bk-intro">Tu progreso se guarda solo en este dispositivo. Descarga un respaldo de vez en cuando y guárdalo donde quieras (tu Google Drive, correo, etc.). Si cambias de teléfono, lo restauras aquí.</div>
+    <div class="bk-row">
+      <button class="bk-btn dl" id="bkExport">⤓ Descargar respaldo</button>
+      <button class="bk-btn up" id="bkImportBtn">⤒ Restaurar respaldo</button>
+    </div>
+    <input type="file" id="bkFile" accept="application/json,.json" style="display:none">
+  </div>`;
+
   document.getElementById("sBody").innerHTML=html;
   document.getElementById("sFoot").innerHTML=`<button class="cta" id="ctaBtn" style="background:var(--gold)">Seguir construyendo</button>`;
   document.getElementById("ctaBtn").onclick=backClose;
@@ -3483,6 +3683,27 @@ function openSummary(){
   document.querySelectorAll(".st-go").forEach(el=>{
     el.onclick=(e)=>{ e.stopPropagation(); const n=byId[el.dataset.goto]; if(n){ close(); centerOn(n.x,n.y,.95); setTimeout(()=>open(n),420); } };
   });
+  // wire respaldo
+  const bkE=document.getElementById("bkExport");
+  if(bkE) bkE.onclick=exportProgress;
+  const bkB=document.getElementById("bkImportBtn"), bkF=document.getElementById("bkFile");
+  if(bkB && bkF){
+    bkB.onclick=()=>bkF.click();
+    bkF.onchange=()=>{
+      if(bkF.files && bkF.files[0]){
+        confirmDialog(
+          "Restaurar respaldo",
+          "Esto reemplazará tu progreso actual con el del archivo. Úsalo si cambiaste de dispositivo o quieres recuperar un respaldo. ¿Seguir?",
+          "Sí, restaurar",
+          ()=>{ importProgressFile(bkF.files[0], ()=>{
+            // recargar todo el estado y refrescar
+            start();
+            close();
+          }); }
+        );
+      }
+    };
+  }
 
   openSheetUI();
 }
