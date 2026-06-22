@@ -74,17 +74,54 @@
   .node.done .check{display:grid}
 
   /* ---- controles flotantes ---- */
-  #fab{position:fixed;right:12px;bottom:16px;z-index:40;display:flex;flex-direction:column;gap:9px}
+  #fab{position:fixed;right:12px;bottom:16px;z-index:40;display:flex;flex-direction:column;gap:9px;align-items:center}
   .fbtn{width:46px;height:46px;border-radius:14px;background:var(--panel);border:1px solid var(--line);
     color:var(--ink);font-size:19px;display:grid;place-items:center;cursor:pointer;
     box-shadow:0 6px 20px rgba(0,0,0,.5)}
   .fbtn:active{transform:scale(.92)}
-  #legend{position:fixed;left:12px;bottom:16px;z-index:35;display:flex;flex-wrap:wrap;gap:6px;max-width:62vw}
+  .fbtn.sm{width:40px;height:40px;font-size:17px;background:rgba(16,20,27,.7)}
+  .fbtn.main{background:var(--gold);color:#0a0c10;font-size:20px;transition:transform .3s}
+  #fab.open .fbtn.main{transform:rotate(90deg)}
+  /* grupo de acciones: oculto hasta abrir */
+  .fab-group{display:flex;flex-direction:column;gap:9px;align-items:center;
+    max-height:0;opacity:0;overflow:hidden;pointer-events:none;
+    transition:max-height .32s cubic-bezier(.2,.8,.2,1),opacity .25s}
+  #fab.open .fab-group{max-height:260px;opacity:1;pointer-events:auto}
+  .fab-group .fbtn{transform:translateY(8px);transition:transform .3s,opacity .25s;opacity:0}
+  #fab.open .fab-group .fbtn{transform:translateY(0);opacity:1}
+  #fab.open .fab-group .fbtn:nth-child(1){transition-delay:.02s}
+  #fab.open .fab-group .fbtn:nth-child(2){transition-delay:.06s}
+  #fab.open .fab-group .fbtn:nth-child(3){transition-delay:.10s}
+  #fab.open .fab-group .fbtn:nth-child(4){transition-delay:.14s}
+  .fab-zoom{display:flex;flex-direction:column;gap:7px;align-items:center;margin-top:3px}
+
+  #legend{position:fixed;left:12px;bottom:16px;z-index:35;display:none;flex-direction:column;gap:6px;max-width:60vw;
+    background:rgba(10,12,16,.92);border:1px solid var(--line);border-radius:14px;padding:11px 12px;
+    box-shadow:0 8px 28px rgba(0,0,0,.55)}
+  #legend.show{display:flex;animation:legendIn .25s ease}
+  @keyframes legendIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  #legend .lg-title{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:3px}
+  #legend .lg-grid{display:flex;flex-wrap:wrap;gap:6px;max-width:240px}
   .lg{font-size:9px;letter-spacing:.05em;padding:4px 8px;border-radius:20px;
     background:rgba(16,20,27,.82);border:1px solid var(--line);color:var(--muted);
     display:flex;align-items:center;gap:5px;cursor:pointer;transition:.2s}
   .lg .dot{width:8px;height:8px;border-radius:50%}
   .lg.off{opacity:.32}
+
+  /* animación de revelado de nodos */
+  @keyframes nodeReveal{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}
+    55%{opacity:1;transform:translate(-50%,-50%) scale(1.18)}
+    75%{transform:translate(-50%,-50%) scale(.94)}
+    100%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  }
+  .node.reveal-anim{animation:nodeReveal .62s cubic-bezier(.2,.9,.3,1.2) both}
+  @keyframes glyphSpark{
+    0%{box-shadow:0 0 0 0 var(--bcol)}
+    60%{box-shadow:0 0 22px 4px var(--bcol)}
+    100%{box-shadow:0 0 14px -2px var(--bcol)}
+  }
+  .node.reveal-anim .glyph{animation:glyphSpark .9s ease-out both}
 
   /* ---- panel de detalle ---- */
   #scrim{position:fixed;inset:0;background:rgba(4,5,8,.66);backdrop-filter:blur(3px);
@@ -380,16 +417,22 @@
   </div>
 </div>
 
-<div id="legend"></div>
-
 <div id="fab">
-  <div class="fbtn" id="skills" style="color:#7fcec2">⚒</div>
-  <div class="fbtn" id="vice" style="color:#d6a93f">🛡</div>
-  <div class="fbtn" id="summary">📊</div>
-  <div class="fbtn" id="zin">+</div>
-  <div class="fbtn" id="zout">−</div>
-  <div class="fbtn" id="recenter">⌖</div>
+  <div class="fab-group" id="fabGroup">
+    <div class="fbtn act" id="skills" style="color:#7fcec2" title="Skills">⚒</div>
+    <div class="fbtn act" id="vice" style="color:#d6a93f" title="Dominio">🛡</div>
+    <div class="fbtn act" id="summary" title="Resumen">📊</div>
+    <div class="fbtn act" id="legendBtn" title="Ramas">◷</div>
+  </div>
+  <div class="fbtn main" id="fabToggle">☰</div>
+  <div class="fab-zoom" id="fabZoom">
+    <div class="fbtn sm" id="zin">+</div>
+    <div class="fbtn sm" id="zout">−</div>
+    <div class="fbtn sm" id="recenter">⌖</div>
+  </div>
 </div>
+
+<div id="legend"></div>
 
 <div class="hint" id="hint">Arrastra para moverte · pellizca para zoom</div>
 <div class="toast" id="toast"></div>
@@ -2549,6 +2592,56 @@ function status(n){
   return "available";
 }
 
+/* ---------- revelado progresivo ----------
+   Al inicio solo se ven el núcleo y las 10 ramas mayores (tier 0 y 1).
+   Los hijos de una rama (tier 2 y 3) aparecen cuando esa rama mayor
+   se pone en juego (empezada o dominada) o cuando el propio nodo ya
+   tiene actividad. Da sensación de descubrimiento y no abruma. */
+function rootBranchNode(n){
+  // el nodo tier-1 (rama mayor) al que pertenece este nodo
+  return NODES.find(x=>x.branch===n.branch && x.tier===1);
+}
+function isRevealed(n){
+  if(n.tier<=1) return true;                 // núcleo y ramas mayores: siempre
+  if(DONE.has(n.id)||PRAC[n.id]) return true; // ya tiene actividad
+  if(typeof ACTIVE_PATH!=="undefined" && ACTIVE_PATH && ACTIVE_PATH.includes(n.id)) return true; // en ruta activa
+  const root=rootBranchNode(n);
+  if(root && (DONE.has(root.id)||PRAC[root.id])) return true; // su rama está en juego
+  return false;
+}
+function applyVisibility(){
+  NODES.forEach(n=>{
+    const el=elById[n.id]; if(!el) return;
+    const hiddenByFilter=HIDDEN.has(n.branch);
+    const hiddenByReveal=!isRevealed(n);
+    el.style.display=(hiddenByFilter||hiddenByReveal)?"none":"";
+  });
+  // líneas: ocultar las que conecten a un nodo no visible
+  NODES.forEach(n=>{
+    if(!n.need) return;
+    n.need.forEach(pid=>{
+      const ln=document.getElementById(`L_${pid}_${n.id}`);
+      if(!ln) return;
+      const vis=isRevealed(n)&&isRevealed(byId[pid])&&!HIDDEN.has(n.branch);
+      ln.style.display=vis?"":"none";
+    });
+  });
+}
+// detectar nodos recién revelados para animarlos
+let REVEALED_SEEN=new Set();
+function animateNewlyRevealed(){
+  NODES.forEach(n=>{
+    if(isRevealed(n) && !REVEALED_SEEN.has(n.id)){
+      REVEALED_SEEN.add(n.id);
+      const el=elById[n.id];
+      if(el && n.tier>1){
+        el.classList.remove("reveal-anim"); void el.offsetWidth; // reiniciar
+        el.classList.add("reveal-anim");
+      }
+    }
+  });
+}
+
 /* ---------- nivel ---------- */
 // Cada nodo completado = XP. Subir de nivel cada N nodos crecientes.
 function levelInfo(){
@@ -2640,12 +2733,14 @@ function refreshAll(){
     });
   });
   renderLevel();
+  applyVisibility();
+  animateNewlyRevealed();
 }
-
-/* ---------- leyenda / filtros ---------- */
 const HIDDEN=new Set();
 function buildLegend(){
   const wrap=document.getElementById("legend");
+  wrap.innerHTML=`<div class="lg-title">Filtrar ramas</div><div class="lg-grid" id="lgGrid"></div>`;
+  const grid=document.getElementById("lgGrid");
   Object.entries(BRANCHES).forEach(([k,b])=>{
     if(k==="core") return;
     const el=document.createElement("div");
@@ -2654,10 +2749,9 @@ function buildLegend(){
     el.onclick=()=>{
       if(HIDDEN.has(k)){HIDDEN.delete(k);el.classList.remove("off");}
       else{HIDDEN.add(k);el.classList.add("off");}
-      NODES.forEach(n=>{ if(n.branch===k && elById[n.id]) elById[n.id].style.display=HIDDEN.has(k)?"none":""; });
-      document.querySelectorAll("#lines line").forEach(l=>{});
+      applyVisibility();
     };
-    wrap.appendChild(el);
+    grid.appendChild(el);
   });
 }
 
@@ -2818,6 +2912,7 @@ function pathProgress(seq){
 }
 function followPath(p){
   ACTIVE_PATH=[...new Set(p.seq)];
+  applyVisibility(); animateNewlyRevealed();
   // marcar nodos del camino visualmente
   NODES.forEach(n=>{ const el=elById[n.id]; if(el) el.classList.toggle("onpath",ACTIVE_PATH.includes(n.id)); });
   const next=pathNextNode(p.seq);
@@ -2969,9 +3064,16 @@ document.getElementById("summary").onclick=openSummary;
 
 /* ---------- empezar práctica / dominar / retroceder ---------- */
 function startPractice(n){
+  const wasTier1=n.tier===1;
   PRAC[n.id]={started:todayKey(), lastTouch:todayKey()};
   savePrac(); refreshAll(); open(n);
-  toast(`Empezaste a practicar: ${n.title}`);
+  if(wasTier1){
+    const kids=NODES.filter(x=>x.branch===n.branch && x.tier>1).length;
+    if(kids>0) toast(`Rama abierta: ${kids} caminos nuevos aparecen ✦`);
+    else toast(`Empezaste a practicar: ${n.title}`);
+  }else{
+    toast(`Empezaste a practicar: ${n.title}`);
+  }
 }
 function abandonPractice(n){
   delete PRAC[n.id]; savePrac(); refreshAll(); open(n);
@@ -3535,6 +3637,23 @@ function zoomBtn(f){
 }
 document.getElementById("recenter").onclick=()=>centerOn(0,0,.58);
 
+/* toggle del menú flotante */
+const fabEl=document.getElementById("fab");
+document.getElementById("fabToggle").onclick=()=>{
+  fabEl.classList.toggle("open");
+  if(!fabEl.classList.contains("open")) document.getElementById("legend").classList.remove("show");
+};
+// al tocar una acción, cerrar el menú para despejar
+["skills","vice","summary"].forEach(id=>{
+  const el=document.getElementById(id);
+  const prev=el.onclick;
+  el.addEventListener("click",()=>{ fabEl.classList.remove("open"); document.getElementById("legend").classList.remove("show"); });
+});
+// botón de leyenda
+document.getElementById("legendBtn").onclick=()=>{
+  document.getElementById("legend").classList.toggle("show");
+};
+
 /* ---------- intro ---------- */
 document.getElementById("introGo").onclick=()=>{
   const i=document.getElementById("intro");
@@ -3549,9 +3668,12 @@ async function start(){
   await loadVice();
   await loadSkills();
   build();
+  // marcar como ya vistos los nodos visibles al cargar (no se animan)
+  NODES.forEach(n=>{ if(isRevealed(n)) REVEALED_SEEN.add(n.id); });
   buildLegend();
   centerOn(0,0,.58);
   renderLevel();
+  applyVisibility();
 }
 start();
 
