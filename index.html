@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>SENDA · Árbol del Hombre Completo</title>
 <style>
   :root{
@@ -29,7 +29,7 @@
 
   /* ---- HUD superior ---- */
   #hud{position:fixed;top:0;left:0;right:0;z-index:40;
-    padding:10px 14px;display:flex;align-items:center;gap:14px;
+    padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:14px;
     background:linear-gradient(180deg,rgba(8,9,12,.96),rgba(8,9,12,.55) 70%,transparent);
     pointer-events:none}
   #hud > *{pointer-events:auto}
@@ -74,13 +74,16 @@
   .node.done .check{display:grid}
 
   /* ---- controles flotantes ---- */
-  #fab{position:fixed;right:12px;bottom:16px;z-index:40;display:flex;flex-direction:column;gap:9px;align-items:center}
+  #fab{position:fixed;right:14px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:40;display:flex;flex-direction:column;gap:9px;align-items:center}
   .fbtn{width:46px;height:46px;border-radius:14px;background:var(--panel);border:1px solid var(--line);
     color:var(--ink);font-size:19px;display:grid;place-items:center;cursor:pointer;
     box-shadow:0 6px 20px rgba(0,0,0,.5)}
   .fbtn:active{transform:scale(.92)}
-  .fbtn.sm{width:40px;height:40px;font-size:17px;background:rgba(16,20,27,.7)}
-  .fbtn.main{background:var(--gold);color:#0a0c10;font-size:20px;transition:transform .3s}
+  .fbtn.sm{width:38px;height:38px;font-size:16px;background:rgba(16,20,27,.55);
+    border-color:rgba(28,33,40,.7);color:var(--muted);box-shadow:none}
+  .fbtn.sm:active{color:var(--ink)}
+  .fbtn.main{background:var(--gold);color:#0a0c10;font-size:20px;transition:transform .3s;
+    box-shadow:0 8px 24px rgba(201,168,74,.35)}
   #fab.open .fbtn.main{transform:rotate(90deg)}
   /* grupo de acciones: oculto hasta abrir */
   .fab-group{display:flex;flex-direction:column;gap:9px;align-items:center;
@@ -95,7 +98,7 @@
   #fab.open .fab-group .fbtn:nth-child(4){transition-delay:.14s}
   .fab-zoom{display:flex;flex-direction:column;gap:7px;align-items:center;margin-top:3px}
 
-  #legend{position:fixed;left:12px;bottom:16px;z-index:35;display:none;flex-direction:column;gap:6px;max-width:60vw;
+  #legend{position:fixed;left:14px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:35;display:none;flex-direction:column;gap:6px;max-width:60vw;
     background:rgba(10,12,16,.92);border:1px solid var(--line);border-radius:14px;padding:11px 12px;
     box-shadow:0 8px 28px rgba(0,0,0,.55)}
   #legend.show{display:flex;animation:legendIn .25s ease}
@@ -122,6 +125,37 @@
     100%{box-shadow:0 0 14px -2px var(--bcol)}
   }
   .node.reveal-anim .glyph{animation:glyphSpark .9s ease-out both}
+
+  /* nodo insinuado (siguiente paso, aún bloqueado) */
+  .node.ghost{opacity:.34;filter:grayscale(.5)}
+  .node.ghost .glyph{border-style:dotted;border-color:#3a3d44;background:#0b0e13;box-shadow:none}
+  .node.ghost .lbl{color:#54585f;font-size:9.5px}
+  .node.ghost .ring,.node.ghost .check,.node.ghost .pdot{display:none!important}
+  .node.ghost:active{opacity:.5}
+
+  /* destello al revelarse */
+  @keyframes sparkPulse{
+    0%{box-shadow:0 0 0 0 rgba(201,168,74,.6)}
+    50%{box-shadow:0 0 26px 6px rgba(201,168,74,.55)}
+    100%{box-shadow:0 0 14px -2px var(--bcol)}
+  }
+  .glyph.spark{animation:sparkPulse 1s ease-out}
+
+  /* tarjeta de recordatorios */
+  #reminderCard{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top));transform:translateX(-50%) translateY(-16px);
+    z-index:58;width:min(360px,92vw);background:linear-gradient(180deg,#12161e,#0c1016);
+    border:1px solid #2a2f38;border-radius:15px;box-shadow:0 14px 40px rgba(0,0,0,.55);
+    opacity:0;pointer-events:none;transition:opacity .35s,transform .35s}
+  #reminderCard.show{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+  .rem-head{display:flex;justify-content:space-between;align-items:center;padding:12px 15px 8px;
+    font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--line)}
+  .rem-x{cursor:pointer;color:var(--muted);font-size:13px;letter-spacing:0}
+  .rem-it{display:flex;gap:11px;align-items:flex-start;padding:12px 15px;cursor:pointer;
+    border-bottom:1px solid #14181f;transition:background .15s}
+  .rem-it:last-child{border-bottom:none}
+  .rem-it:active{background:#151a22}
+  .rem-ic{flex:none;font-size:15px;margin-top:1px}
+  .rem-tx{font-size:13px;line-height:1.45;color:#d2cab4}
 
   /* ---- panel de detalle ---- */
   #scrim{position:fixed;inset:0;background:rgba(4,5,8,.66);backdrop-filter:blur(3px);
@@ -188,6 +222,24 @@
     letter-spacing:.04em;cursor:pointer;font-family:inherit;background:var(--bcol);color:#0a0c10}
   .cta.undo{background:transparent;border:1px solid var(--locked);color:var(--muted)}
   .cta.disabled{background:#1a1e26;color:#555;cursor:not-allowed}
+  .cta-sec{width:100%;margin-top:9px;background:transparent;border:none;color:var(--muted);
+    font-family:inherit;font-size:12.5px;cursor:pointer;padding:8px;border-radius:10px;transition:.15s}
+  .cta-sec:active{background:#151a22;color:var(--ink)}
+
+  /* material para dominar */
+  .mat-intro{font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:11px}
+  .mat-grid{display:flex;gap:9px;margin-bottom:10px}
+  .mat-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+    padding:13px 10px;border-radius:11px;font-size:13px;font-weight:600;text-decoration:none;
+    border:1px solid var(--line);transition:.15s}
+  .mat-btn span{font-size:13px}
+  .mat-btn.yt{background:rgba(192,71,63,.1);border-color:rgba(192,71,63,.4);color:#e89a94}
+  .mat-btn.go{background:rgba(91,141,217,.1);border-color:rgba(91,141,217,.4);color:#9fc0ec}
+  .mat-btn:active{transform:scale(.98)}
+  .mat-sources{display:flex;flex-direction:column;gap:7px}
+  .mat-src{font-size:12.5px;color:var(--bcol);text-decoration:none;padding:9px 12px;
+    background:#0e1218;border:1px solid var(--line);border-radius:10px;transition:.15s}
+  .mat-src:active{background:#151a22}
 
   /* intro */
   #intro{position:fixed;inset:0;z-index:80;background:radial-gradient(ellipse at 50% 40%,#11151d,#070809);
@@ -196,7 +248,7 @@
   #intro p{color:var(--muted);font-size:13px;max-width:340px;line-height:1.7;margin:0 auto 26px}
   #intro .go{background:var(--gold);color:#100c02;border:none;padding:14px 34px;border-radius:30px;
     font-family:inherit;font-size:15px;letter-spacing:.1em;font-weight:600;cursor:pointer}
-  .hint{position:fixed;bottom:74px;left:50%;transform:translateX(-50%);z-index:30;
+  .hint{position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));left:42%;transform:translateX(-50%);z-index:30;
     font-size:11px;color:var(--muted);background:rgba(10,12,16,.8);padding:6px 14px;border-radius:20px;
     letter-spacing:.05em;opacity:0;transition:opacity .4s;pointer-events:none}
   .toast{position:fixed;top:64px;left:50%;transform:translateX(-50%) translateY(-12px);z-index:70;
@@ -215,6 +267,25 @@
     margin-bottom:9px;display:flex;align-items:center;gap:7px}
   .norte-lab::before{content:"✦"}
   .norte-msg{font-size:14px;line-height:1.62;color:#e0d8c2}
+
+  /* aviso de esfuerzo (sobre/sub/bueno) */
+  .effort{border-radius:13px;padding:14px 15px;margin-bottom:18px;border:1px solid}
+  .effort-lab{font-size:13px;font-weight:600;margin-bottom:6px}
+  .effort-msg{font-size:12.5px;line-height:1.55;margin-bottom:8px}
+  .effort-msg b{font-weight:600}
+  .effort-sci{font-size:11px;line-height:1.5;opacity:.85;font-style:italic}
+  .effort.over{background:rgba(192,71,63,.09);border-color:rgba(192,71,63,.35)}
+  .effort.over .effort-lab{color:#e89a94}
+  .effort.over .effort-msg{color:#d8b4b0}
+  .effort.over .effort-sci{color:#b08a86}
+  .effort.under{background:rgba(214,169,63,.08);border-color:rgba(214,169,63,.32)}
+  .effort.under .effort-lab{color:#e0cda0}
+  .effort.under .effort-msg{color:#d0c4a4}
+  .effort.under .effort-sci{color:#a89878}
+  .effort.good{background:rgba(76,169,107,.08);border-color:rgba(76,169,107,.3)}
+  .effort.good .effort-lab{color:#8fbf9f}
+  .effort.good .effort-msg{color:#b8d4c0}
+  .effort.good .effort-sci{color:#88a890}
   .verdict{display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap}
   .vcard{flex:1;min-width:130px;border-radius:13px;padding:13px 14px;border:1px solid var(--line);background:#0e1218}
   .vcard .vlab{font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
@@ -289,6 +360,34 @@
     border-left:2px solid #3a5577;padding-left:14px;margin:22px 0;text-align:left}
 
   /* panel módulo de vicios */
+  /* lista de hábitos a dominar */
+  .vice-item{display:flex;align-items:center;gap:12px;background:#0e1218;border:1px solid var(--line);
+    border-radius:12px;padding:12px 13px;margin-bottom:9px;cursor:pointer;transition:.15s}
+  .vice-item:active{transform:scale(.99);background:#11161e}
+  .vi-ico{flex:none;width:38px;height:38px;border-radius:10px;background:#151a22;display:grid;place-items:center;
+    font-size:18px;color:#d6a93f}
+  .vi-body{flex:1;min-width:0}
+  .vi-name{font-size:14px;font-weight:600;color:var(--ink)}
+  .vi-sub{font-size:11px;color:var(--muted);margin-top:2px}
+  .vi-kind{flex:none;font-size:9.5px;padding:4px 8px;border-radius:20px;white-space:nowrap}
+  .vi-kind.vicio{background:rgba(192,71,63,.14);color:#e0a09a}
+  .vi-kind.equilibrio{background:rgba(91,141,217,.14);color:#9fc0ec}
+  /* recompensas */
+  .rew-intro{font-size:12.5px;color:var(--muted);line-height:1.55;margin-bottom:11px}
+  .rew-intro b{color:#c9c0a8}
+  .rew-balance{font-size:13px;color:#e0cda0;background:rgba(214,169,63,.1);border:1px solid rgba(214,169,63,.3);
+    border-radius:10px;padding:10px 12px;text-align:center;margin-bottom:12px}
+  .rew-balance b{font-size:16px}
+  .rew-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .rew-card{display:flex;flex-direction:column;align-items:center;gap:4px;background:#0e1218;
+    border:1px solid var(--line);border-radius:11px;padding:13px 8px;cursor:pointer;font-family:inherit;transition:.15s}
+  .rew-card:active{transform:scale(.97)}
+  .rew-card.lock{opacity:.45}
+  .rew-ico{font-size:20px;color:#d6a93f}
+  .rew-name{font-size:11.5px;color:var(--ink);text-align:center;line-height:1.3}
+  .rew-cost{font-size:10.5px;color:#d6a93f;font-weight:600}
+  .rew-note{font-size:11px;color:var(--muted);line-height:1.5;margin-top:11px;font-style:italic}
+
   .vice-counter{text-align:center;padding:18px 0 22px}
   .vc-num{font-size:64px;line-height:1;color:var(--gold);font-weight:600;letter-spacing:.02em}
   .vc-lab{font-size:13px;color:var(--muted);margin-top:8px;letter-spacing:.04em}
@@ -385,9 +484,32 @@
   .prac-card{background:#0e1218;border:1px solid var(--line);border-radius:13px;padding:14px}
   .prac-top{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.04em;color:var(--muted);margin-bottom:8px}
   .prac-top span:first-child{color:var(--gold);letter-spacing:.16em;text-transform:uppercase;font-size:10px}
-  .prac-bar{height:8px;background:#161b22;border-radius:5px;overflow:hidden}
+  /* etapas */
+  .stages{display:flex;justify-content:space-between;margin-bottom:16px;position:relative}
+  .stages::before{content:"";position:absolute;top:6px;left:8%;right:8%;height:1px;background:#23282f}
+  .stage-dot{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:9.5px;
+    letter-spacing:.04em;color:#54585f;position:relative;z-index:1;flex:1}
+  .stage-dot span{width:13px;height:13px;border-radius:50%;background:#161b22;border:1.5px solid #2a2f38}
+  .stage-dot.on{color:var(--ink)}
+  .stage-dot.on span{background:var(--gold);border-color:var(--gold)}
+  .stage-dot.cur span{box-shadow:0 0 10px -1px var(--gold)}
+  /* métricas (dos barras) */
+  .prac-metric{margin-bottom:11px}
+  .pm-row{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-bottom:5px}
+  .prac-bar{height:8px;background:#161b22;border-radius:5px;overflow:hidden;position:relative}
   .prac-fill{height:100%;background:linear-gradient(90deg,var(--gold-soft),var(--gold));border-radius:5px;transition:width .5s}
+  .prac-fill.alt{background:linear-gradient(90deg,#3a6a86,#5b8dd9)}
+  .prac-mark{position:absolute;top:-2px;width:2px;height:12px;background:#7a6630;opacity:.7;border-radius:2px}
   .prac-note{font-size:11.5px;color:var(--muted);line-height:1.55;margin-top:10px}
+  .prac-note b{color:#c9c0a8}
+  /* registro de minutos de hoy */
+  .log-today{margin-top:13px;padding-top:13px;border-top:1px solid #1a1f27}
+  .lt-q{font-size:12.5px;color:#d2cab4;margin-bottom:9px}
+  .lt-opts{display:flex;gap:7px;flex-wrap:wrap}
+  .lt-min{flex:1;min-width:42px;padding:11px 0;border-radius:9px;background:#11161e;border:1px solid var(--line);
+    color:var(--ink);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+  .lt-min:active{background:var(--gold);color:#0a0c10;transform:scale(.96)}
+  .lt-hint{font-size:10.5px;color:var(--muted);margin-top:8px;line-height:1.4}
   .prac-warn{font-size:12px;color:#e0a09a;background:rgba(192,71,63,.09);border:1px solid rgba(192,71,63,.3);
     border-radius:9px;padding:9px 11px;margin-top:11px;line-height:1.5}
   .prac-warn b{color:#eebab4}
@@ -519,7 +641,7 @@ const NODES = [
 "links": [
 {
 "t": "Modelo transteórico del cambio",
-"u": "https://es.wikipedia.org/wiki/Modelo_transte%C3%B3rico"
+"u": "https://en.wikipedia.org/wiki/Transtheoretical_model"
 }
 ]
 },
@@ -588,7 +710,7 @@ const NODES = [
 "links": [
 {
 "t": "Deep Work — resumen",
-"u": "https://fs.blog/deep-work/"
+"u": "https://en.wikipedia.org/wiki/Deep_Work"
 }
 ]
 },
@@ -672,7 +794,7 @@ const NODES = [
 "links": [
 {
 "t": "Enquiridión de Epicteto",
-"u": "https://es.wikisource.org/wiki/Enquiridi%C3%B3n"
+"u": "https://www.gutenberg.org/ebooks/45109"
 },
 {
 "t": "Daily Stoic",
@@ -1195,7 +1317,7 @@ const NODES = [
 "time": "8–12 semanas",
 "why": "La capacidad cardiovascular (VO2 máx) es uno de los predictores más fuertes de longevidad que existen. No se trata de correr maratones: combinar cardio suave abundante con algo de alta intensidad construye un motor que te mantiene joven por dentro.",
 "evidence": "Un VO2 máx alto se asocia a menor mortalidad de forma muy robusta (estudio en JAMA, 2018, +120.000 personas): la baja capacidad cardiorrespiratoria fue comparable a factores de riesgo como fumar o la diabetes.",
-"study": {"t": "Capacidad cardiorrespiratoria y mortalidad (JAMA 2018)", "u": "https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2707428"},
+"study": {"t": "Capacidad cardiorrespiratoria y mortalidad (JAMA 2018)", "u": "https://pubmed.ncbi.nlm.nih.gov/30575882/"},
 "tips": [
 "Base aeróbica: mucho cardio fácil donde puedas conversar (Zona 2).",
 "Añade 1–2 sesiones cortas de alta intensidad por semana.",
@@ -1217,7 +1339,7 @@ const NODES = [
 "links": [
 {
 "t": "VO2 máx y longevidad (JAMA)",
-"u": "https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2707428"
+"u": "https://pubmed.ncbi.nlm.nih.gov/30575882/"
 }
 ]
 },
@@ -1363,7 +1485,7 @@ const NODES = [
 "links": [
 {
 "t": "Guía de inversión para principiantes",
-"u": "https://www.investopedia.com/articles/basics/06/invest1000.asp"
+"u": "https://www.khanacademy.org/college-careers-more/personal-financearticles/basics/06/invest1000.asp"
 }
 ]
 },
@@ -1401,7 +1523,7 @@ const NODES = [
 "links": [
 {
 "t": "Construir habilidades valiosas",
-"u": "https://www.indeed.com/career-advice/career-development/most-valuable-skills"
+"u": "https://en.wikipedia.org/wiki/Skill"
 }
 ]
 },
@@ -1440,7 +1562,7 @@ const NODES = [
 "links": [
 {
 "t": "Conceptos básicos de impuestos",
-"u": "https://www.investopedia.com/taxes-4427724"
+"u": "https://www.khanacademy.org/college-careers-more/personal-financetaxes-4427724"
 }
 ]
 },
@@ -1549,7 +1671,7 @@ const NODES = [
 "links": [
 {
 "t": "Inteligencia emocional",
-"u": "https://www.verywellmind.com/what-is-emotional-intelligence-2795423"
+"u": "https://www.helpguide.org/articles/mental-health/emotional-intelligence-eq.htm"
 }
 ]
 },
@@ -1742,7 +1864,7 @@ const NODES = [
 "links": [
 {
 "t": "Cómo poner límites sanos",
-"u": "https://www.psychologytoday.com/intl/basics/boundaries"
+"u": "https://www.psychologytoday.com/us/basics/boundaries"
 }
 ]
 },
@@ -1781,7 +1903,7 @@ const NODES = [
 "links": [
 {
 "t": "Liderazgo de servicio",
-"u": "https://es.wikipedia.org/wiki/Liderazgo_de_servicio"
+"u": "https://en.wikipedia.org/wiki/Servant_leadership"
 }
 ]
 },
@@ -1857,7 +1979,7 @@ const NODES = [
 "links": [
 {
 "t": "Psicología de la atracción",
-"u": "https://www.psychologytoday.com/intl/basics/attraction"
+"u": "https://www.psychologytoday.com/us/basics/relationships"
 }
 ]
 },
@@ -2092,7 +2214,7 @@ const NODES = [
 "links": [
 {
 "t": "Técnicas básicas de cocina",
-"u": "https://www.seriouseats.com/cooking-techniques-5117679"
+"u": "https://en.wikipedia.org/wiki/List_of_cooking_techniques"
 }
 ]
 },
@@ -2316,9 +2438,32 @@ const PATHS = [
 
 /* ---- Módulo de dominio sobre vicios/hábitos no deseados ---- */
 const VICE_DEFS = [
-  {id:"lujuria", name:"Lujuria / impulso sexual", icon:"🜂",
+  {id:"lujuria", name:"Lujuria / impulso sexual", icon:"🜂", kind:"vicio",
    why_default:"Quiero recuperar el control de mi atención y mi energía, y dejar de que un impulso decida por mí.",
    triggers:["Aburrimiento","Soledad","Estrés / ansiedad","De noche / sin dormir","Redes sociales","Estar solo con el teléfono","Después de discutir","Cansancio"]},
+  {id:"porno", name:"Pornografía", icon:"⊘", kind:"vicio",
+   why_default:"Quiero una sexualidad sana y real, no una versión de pantalla que me roba energía y deforma lo que espero.",
+   triggers:["Soledad","Aburrimiento","De noche / sin dormir","Estrés / ansiedad","Estar solo con el teléfono","Curiosidad ociosa","Después de redes sociales"]},
+  {id:"procrastinacion", name:"Procrastinación", icon:"⧖", kind:"equilibrio",
+   why_default:"Quiero hacer lo que importa cuando toca, y no dejar que el miedo o la pereza decidan por mí.",
+   triggers:["Tarea que da pereza","Miedo a hacerlo mal","Tarea muy grande","Distracción a la mano","No sé por dónde empezar","Cansancio","Perfeccionismo"]},
+  {id:"juegos", name:"Videojuegos en exceso", icon:"◰", kind:"equilibrio",
+   why_default:"Jugar no es malo; jugar para huir de mi vida sí. Quiero que sea un premio, no un escape.",
+   triggers:["Aburrimiento","Evitar una tarea","Estrés / ansiedad","Soledad","Por costumbre al llegar a casa","Vacío después del trabajo","Insomnio"]},
+  {id:"scroll", name:"Redes sociales / scroll", icon:"⥁", kind:"equilibrio",
+   why_default:"Quiero recuperar mi atención y mi tiempo, y dejar de regalárselos a un feed sin fondo.",
+   triggers:["Aburrimiento","Ansiedad","Esperar (filas, baño)","Al despertar","Antes de dormir","Evitar una tarea","Por reflejo / sin pensar"]},
+  {id:"azucar", name:"Comida chatarra / azúcar", icon:"❋", kind:"equilibrio",
+   why_default:"Quiero comer para nutrirme y disfrutar con conciencia, no por impulso o para tapar emociones.",
+   triggers:["Estrés / ansiedad","Aburrimiento","De noche","Antojo después de comida","Cansancio","Tristeza","Está a la vista / disponible","Premio mal entendido"]},
+];
+const REWARD_DEFS = [
+  {id:"jugar", name:"Jugar un rato", icon:"◰", cost:2},
+  {id:"serie", name:"Ver una serie/peli", icon:"▷", cost:2},
+  {id:"redes", name:"Rato libre de redes", icon:"⥁", cost:1},
+  {id:"gusto", name:"Un gusto para comer", icon:"❋", cost:1},
+  {id:"descanso", name:"Tarde de descanso total", icon:"☾", cost:4},
+  {id:"libre", name:"Recompensa a tu elección", icon:"✦", cost:3},
 ];
 const SKILLS = [
 {
@@ -2360,7 +2505,7 @@ const SKILLS = [
 "proof": "Registra tu primer cliente pagado y lo que entregaste.",
 "resource": {
 "t": "Cómo empezar como freelance",
-"u": "https://www.upwork.com/resources/how-to-start-freelancing"
+"u": "https://www.freecodecamp.org/news/how-to-start-freelancing/"
 }
 },
 {
@@ -2416,7 +2561,7 @@ const SKILLS = [
 "proof": "Registra tu crecimiento: seguidores, contactos o oportunidades que llegaron por tu marca.",
 "resource": {
 "t": "Construir marca personal",
-"u": "https://www.atlassian.com/blog/leadership/personal-branding"
+"u": "https://hbr.org/2023/05/a-new-approach-to-building-your-personal-brand"
 }
 },
 {
@@ -2486,10 +2631,12 @@ const SKILLS = [
 "proof": "Registra algo real que hiciste en inglés: una entrevista, un cliente, un trabajo.",
 "resource": {
 "t": "Práctica de inglés",
-"u": "https://www.bbc.co.uk/learningenglish/"
+"u": "https://en.wikipedia.org/wiki/English_as_a_second_or_foreign_language"
 }
 }
 ];
+const MATERIAL = {"core": {"yt": "https://www.youtube.com/results?search_query=c%C3%B3mo%20empezar%20desarrollo%20personal%20h%C3%A1bitos%20espa%C3%B1ol", "google": "https://www.google.com/search?q=c%C3%B3mo%20empezar%20desarrollo%20personal%20h%C3%A1bitos", "sources": []}, "mente": {"yt": "https://www.youtube.com/results?search_query=entrenar%20la%20mente%20claridad%20mental%20espa%C3%B1ol", "google": "https://www.google.com/search?q=entrenar%20la%20mente%20claridad%20mental", "sources": [{"t": "Farnam Street (modelos mentales)", "u": "https://fs.blog/"}]}, "foco": {"yt": "https://www.youtube.com/results?search_query=c%C3%B3mo%20mejorar%20la%20concentraci%C3%B3n%20deep%20work%20espa%C3%B1ol", "google": "https://www.google.com/search?q=c%C3%B3mo%20mejorar%20la%20concentraci%C3%B3n%20deep%20work", "sources": [{"t": "Cal Newport — Deep Work", "u": "https://www.calnewport.com/books/deep-work/"}]}, "aprender": {"yt": "https://www.youtube.com/results?search_query=t%C3%A9cnicas%20de%20estudio%20aprendizaje%20efectivo%20recuerdo%20activo%20espa%C3%B1ol", "google": "https://www.google.com/search?q=t%C3%A9cnicas%20de%20estudio%20aprendizaje%20efectivo%20recuerdo%20activo", "sources": [{"t": "Curso 'Learning How to Learn' (Coursera, gratis)", "u": "https://www.coursera.org/learn/learning-how-to-learn"}]}, "estoicismo": {"yt": "https://www.youtube.com/results?search_query=estoicismo%20pr%C3%A1ctico%20Epicteto%20Marco%20Aurelio%20espa%C3%B1ol", "google": "https://www.google.com/search?q=estoicismo%20pr%C3%A1ctico%20Epicteto%20Marco%20Aurelio", "sources": [{"t": "Daily Stoic", "u": "https://dailystoic.com/"}, {"t": "Enquiridión (texto completo)", "u": "https://www.gutenberg.org/ebooks/45109"}]}, "psico-normal": {"yt": "https://www.youtube.com/results?search_query=sesgos%20cognitivos%20psicolog%C3%ADa%20c%C3%B3mo%20piensa%20la%20gente%20espa%C3%B1ol", "google": "https://www.google.com/search?q=sesgos%20cognitivos%20psicolog%C3%ADa%20c%C3%B3mo%20piensa%20la%20gente", "sources": [{"t": "Pensar rápido, pensar despacio (Kahneman)", "u": "https://es.wikipedia.org/wiki/Pensar_r%C3%A1pido,_pensar_despacio"}]}, "psico-oscura": {"yt": "https://www.youtube.com/results?search_query=detectar%20manipulaci%C3%B3n%20gaslighting%20narcisismo%20defensa%20espa%C3%B1ol", "google": "https://www.google.com/search?q=detectar%20manipulaci%C3%B3n%20gaslighting%20narcisismo%20defensa", "sources": [{"t": "Psychology Today — manipulación", "u": "https://www.psychologytoday.com/us/basics/gaslighting"}]}, "pensamiento-critico": {"yt": "https://www.youtube.com/results?search_query=pensamiento%20cr%C3%ADtico%20falacias%20l%C3%B3gicas%20razonamiento%20espa%C3%B1ol", "google": "https://www.google.com/search?q=pensamiento%20cr%C3%ADtico%20falacias%20l%C3%B3gicas%20razonamiento", "sources": [{"t": "Khan Academy — lógica y razonamiento", "u": "https://es.khanacademy.org/"}]}, "memoria": {"yt": "https://www.youtube.com/results?search_query=palacio%20de%20la%20memoria%20t%C3%A9cnicas%20de%20memorizaci%C3%B3n%20espa%C3%B1ol", "google": "https://www.google.com/search?q=palacio%20de%20la%20memoria%20t%C3%A9cnicas%20de%20memorizaci%C3%B3n", "sources": [{"t": "Moonwalking with Einstein (resumen)", "u": "https://www.youtube.com/results?search_query=palacio+de+la+memoria+t%C3%A9cnica"}]}, "poder": {"yt": "https://www.youtube.com/results?search_query=din%C3%A1micas%20de%20poder%20influencia%20liderazgo%20espa%C3%B1ol", "google": "https://www.google.com/search?q=din%C3%A1micas%20de%20poder%20influencia%20liderazgo", "sources": [{"t": "Robert Cialdini — influencia", "u": "https://www.influenceatwork.com/principles-of-persuasion/"}]}, "leyes-poder": {"yt": "https://www.youtube.com/results?search_query=48%20leyes%20del%20poder%20Robert%20Greene%20resumen%20espa%C3%B1ol", "google": "https://www.google.com/search?q=48%20leyes%20del%20poder%20Robert%20Greene%20resumen", "sources": [{"t": "Resumen 48 leyes (Shortform)", "u": "https://www.shortform.com/blog/48-laws-of-power/"}]}, "carisma": {"yt": "https://www.youtube.com/results?search_query=c%C3%B3mo%20desarrollar%20carisma%20presencia%20lenguaje%20corporal%20espa%C3%B1ol", "google": "https://www.google.com/search?q=c%C3%B3mo%20desarrollar%20carisma%20presencia%20lenguaje%20corporal", "sources": [{"t": "Science of People — carisma", "u": "https://www.scienceofpeople.com/charisma/"}]}, "oratoria": {"yt": "https://www.youtube.com/results?search_query=hablar%20en%20p%C3%BAblico%20oratoria%20persuasi%C3%B3n%20t%C3%A9cnicas%20espa%C3%B1ol", "google": "https://www.google.com/search?q=hablar%20en%20p%C3%BAblico%20oratoria%20persuasi%C3%B3n%20t%C3%A9cnicas", "sources": [{"t": "Toastmasters", "u": "https://www.toastmasters.org/"}, {"t": "Charlas TED sobre hablar en público", "u": "https://www.ted.com/topics/public+speaking"}]}, "negociacion": {"yt": "https://www.youtube.com/results?search_query=t%C3%A9cnicas%20de%20negociaci%C3%B3n%20Chris%20Voss%20m%C3%A9todo%20Harvard%20espa%C3%B1ol", "google": "https://www.google.com/search?q=t%C3%A9cnicas%20de%20negociaci%C3%B3n%20Chris%20Voss%20m%C3%A9todo%20Harvard", "sources": [{"t": "Harvard PON — negociación", "u": "https://www.pon.harvard.edu/"}]}, "cuerpo": {"yt": "https://www.youtube.com/results?search_query=h%C3%A1bitos%20salud%20f%C3%ADsica%20disciplina%20ejercicio%20espa%C3%B1ol", "google": "https://www.google.com/search?q=h%C3%A1bitos%20salud%20f%C3%ADsica%20disciplina%20ejercicio", "sources": [{"t": "Stronger by Science", "u": "https://www.strongerbyscience.com/"}]}, "fuerza": {"yt": "https://www.youtube.com/results?search_query=rutina%20de%20fuerza%20principiantes%20t%C3%A9cnica%20b%C3%A1sicos%20espa%C3%B1ol", "google": "https://www.google.com/search?q=rutina%20de%20fuerza%20principiantes%20t%C3%A9cnica%20b%C3%A1sicos", "sources": [{"t": "r/Fitness — guía (wiki)", "u": "https://thefitness.wiki/"}, {"t": "Stronger by Science — fuerza", "u": "https://www.strongerbyscience.com/complete-strength-training-guide/"}]}, "nutricion": {"yt": "https://www.youtube.com/results?search_query=nutrici%C3%B3n%20b%C3%A1sica%20prote%C3%ADna%20d%C3%A9ficit%20cal%C3%B3rico%20saludable%20espa%C3%B1ol", "google": "https://www.google.com/search?q=nutrici%C3%B3n%20b%C3%A1sica%20prote%C3%ADna%20d%C3%A9ficit%20cal%C3%B3rico%20saludable", "sources": [{"t": "Precision Nutrition", "u": "https://www.precisionnutrition.com/nutrition-guide"}]}, "sueno": {"yt": "https://www.youtube.com/results?search_query=higiene%20del%20sue%C3%B1o%20c%C3%B3mo%20dormir%20mejor%20espa%C3%B1ol", "google": "https://www.google.com/search?q=higiene%20del%20sue%C3%B1o%20c%C3%B3mo%20dormir%20mejor", "sources": [{"t": "Sleep Foundation", "u": "https://www.sleepfoundation.org/sleep-hygiene"}]}, "cardio": {"yt": "https://www.youtube.com/results?search_query=cardio%20zona%202%20mejorar%20resistencia%20VO2%20max%20espa%C3%B1ol", "google": "https://www.google.com/search?q=cardio%20zona%202%20mejorar%20resistencia%20VO2%20max", "sources": [{"t": "Zona 2 — explicación", "u": "https://www.youtube.com/results?search_query=entrenamiento+zona+2+cardio"}]}, "movilidad": {"yt": "https://www.youtube.com/results?search_query=movilidad%20articular%20postura%20rutina%20espa%C3%B1ol", "google": "https://www.google.com/search?q=movilidad%20articular%20postura%20rutina", "sources": [{"t": "NHS — dolor de espalda y ejercicio", "u": "https://www.nhs.uk/conditions/back-pain/"}]}, "dinero": {"yt": "https://www.youtube.com/results?search_query=educaci%C3%B3n%20financiera%20personal%20c%C3%B3mo%20manejar%20dinero%20espa%C3%B1ol", "google": "https://www.google.com/search?q=educaci%C3%B3n%20financiera%20personal%20c%C3%B3mo%20manejar%20dinero", "sources": [{"t": "Investopedia (educación financiera)", "u": "https://www.khanacademy.org/college-careers-more/personal-finance"}]}, "presupuesto": {"yt": "https://www.youtube.com/results?search_query=c%C3%B3mo%20hacer%20un%20presupuesto%2050%2030%2020%20ahorrar%20espa%C3%B1ol", "google": "https://www.google.com/search?q=c%C3%B3mo%20hacer%20un%20presupuesto%2050%2030%2020%20ahorrar", "sources": [{"t": "NerdWallet — presupuesto", "u": "https://www.nerdwallet.com/article/finance/nerdwallet-budget-calculator"}]}, "inversion": {"yt": "https://www.youtube.com/results?search_query=invertir%20para%20principiantes%20fondos%20indexados%20inter%C3%A9s%20compuesto%20espa%C3%B1ol", "google": "https://www.google.com/search?q=invertir%20para%20principiantes%20fondos%20indexados%20inter%C3%A9s%20compuesto", "sources": [{"t": "Bogleheads (filosofía de inversión)", "u": "https://en.wikipedia.org/wiki/Index_fund"}]}, "ingresos": {"yt": "https://www.youtube.com/results?search_query=c%C3%B3mo%20generar%20ingresos%20extra%20habilidades%20freelance%20espa%C3%B1ol", "google": "https://www.google.com/search?q=c%C3%B3mo%20generar%20ingresos%20extra%20habilidades%20freelance", "sources": [{"t": "Indeed — habilidades valiosas", "u": "https://en.wikipedia.org/wiki/Skill"}]}, "fiscal": {"yt": "https://www.youtube.com/results?search_query=impuestos%20b%C3%A1sicos%20planificaci%C3%B3n%20fiscal%20legal%20espa%C3%B1ol", "google": "https://www.google.com/search?q=impuestos%20b%C3%A1sicos%20planificaci%C3%B3n%20fiscal%20legal", "sources": [{"t": "Investopedia — impuestos", "u": "https://www.khanacademy.org/college-careers-more/personal-financetaxes-4427724"}]}, "alma": {"yt": "https://www.youtube.com/results?search_query=prop%C3%B3sito%20de%20vida%20bienestar%20sentido%20espa%C3%B1ol", "google": "https://www.google.com/search?q=prop%C3%B3sito%20de%20vida%20bienestar%20sentido", "sources": [{"t": "Greater Good (Berkeley)", "u": "https://greatergood.berkeley.edu/"}]}, "proposito": {"yt": "https://www.youtube.com/results?search_query=encontrar%20prop%C3%B3sito%20valores%20ikigai%20logoterapia%20espa%C3%B1ol", "google": "https://www.google.com/search?q=encontrar%20prop%C3%B3sito%20valores%20ikigai%20logoterapia", "sources": [{"t": "El hombre en busca de sentido (Frankl)", "u": "https://es.wikipedia.org/wiki/El_hombre_en_busca_de_sentido"}]}, "emocional": {"yt": "https://www.youtube.com/results?search_query=inteligencia%20emocional%20regular%20emociones%20respiraci%C3%B3n%20espa%C3%B1ol", "google": "https://www.google.com/search?q=inteligencia%20emocional%20regular%20emociones%20respiraci%C3%B3n", "sources": [{"t": "Verywell Mind — inteligencia emocional", "u": "https://www.helpguide.org/articles/mental-health/emotional-intelligence-eq.htm"}]}, "gratitud": {"yt": "https://www.youtube.com/results?search_query=practicar%20gratitud%20diario%20optimismo%20espa%C3%B1ol", "google": "https://www.google.com/search?q=practicar%20gratitud%20diario%20optimismo", "sources": [{"t": "Greater Good — gratitud", "u": "https://greatergood.berkeley.edu/topic/gratitude"}]}, "meditacion": {"yt": "https://www.youtube.com/results?search_query=c%C3%B3mo%20meditar%20principiantes%20mindfulness%20gu%C3%ADa%20espa%C3%B1ol", "google": "https://www.google.com/search?q=c%C3%B3mo%20meditar%20principiantes%20mindfulness%20gu%C3%ADa", "sources": [{"t": "Mindful.org — cómo meditar", "u": "https://www.mindful.org/how-to-meditate/"}]}, "social": {"yt": "https://www.youtube.com/results?search_query=mejorar%20relaciones%20habilidades%20sociales%20v%C3%ADnculos%20espa%C3%B1ol", "google": "https://www.google.com/search?q=mejorar%20relaciones%20habilidades%20sociales%20v%C3%ADnculos", "sources": [{"t": "Harvard Study of Adult Development", "u": "https://www.adultdevelopmentstudy.org/"}]}, "comunicacion": {"yt": "https://www.youtube.com/results?search_query=comunicaci%C3%B3n%20efectiva%20escucha%20activa%20no%20violenta%20espa%C3%B1ol", "google": "https://www.google.com/search?q=comunicaci%C3%B3n%20efectiva%20escucha%20activa%20no%20violenta", "sources": [{"t": "Comunicación no violenta (Rosenberg)", "u": "https://es.wikipedia.org/wiki/Comunicaci%C3%B3n_no_violenta"}]}, "limites": {"yt": "https://www.youtube.com/results?search_query=poner%20l%C3%ADmites%20sanos%20asertividad%20decir%20no%20espa%C3%B1ol", "google": "https://www.google.com/search?q=poner%20l%C3%ADmites%20sanos%20asertividad%20decir%20no", "sources": [{"t": "Psychology Today — límites", "u": "https://www.psychologytoday.com/us/basics/boundaries"}]}, "liderazgo": {"yt": "https://www.youtube.com/results?search_query=liderazgo%20servicial%20c%C3%B3mo%20liderar%20mentor%C3%ADa%20espa%C3%B1ol", "google": "https://www.google.com/search?q=liderazgo%20servicial%20c%C3%B3mo%20liderar%20mentor%C3%ADa", "sources": [{"t": "Liderazgo de servicio", "u": "https://en.wikipedia.org/wiki/Servant_leadership"}]}, "eros": {"yt": "https://www.youtube.com/results?search_query=salud%20sexual%20intimidad%20madura%20educaci%C3%B3n%20espa%C3%B1ol", "google": "https://www.google.com/search?q=salud%20sexual%20intimidad%20madura%20educaci%C3%B3n", "sources": [{"t": "OMS — salud sexual", "u": "https://www.who.int/health-topics/sexual-health"}]}, "atraccion": {"yt": "https://www.youtube.com/results?search_query=atracci%C3%B3n%20autenticidad%20confianza%20desarrollo%20personal%20espa%C3%B1ol", "google": "https://www.google.com/search?q=atracci%C3%B3n%20autenticidad%20confianza%20desarrollo%20personal", "sources": [{"t": "Psychology Today — atracción", "u": "https://www.psychologytoday.com/us/basics/relationships"}]}, "vinculo-pareja": {"yt": "https://www.youtube.com/results?search_query=apego%20seguro%20relaci%C3%B3n%20de%20pareja%20Gottman%20conflicto%20espa%C3%B1ol", "google": "https://www.google.com/search?q=apego%20seguro%20relaci%C3%B3n%20de%20pareja%20Gottman%20conflicto", "sources": [{"t": "Instituto Gottman", "u": "https://www.gottman.com/"}]}, "espiritu": {"yt": "https://www.youtube.com/results?search_query=espiritualidad%20asombro%20trascendencia%20sentido%20espa%C3%B1ol", "google": "https://www.google.com/search?q=espiritualidad%20asombro%20trascendencia%20sentido", "sources": [{"t": "Greater Good — asombro", "u": "https://greatergood.berkeley.edu/topic/awe"}]}, "filosofia": {"yt": "https://www.youtube.com/results?search_query=introducci%C3%B3n%20filosof%C3%ADa%20%C3%A9tica%20c%C3%B3mo%20vivir%20espa%C3%B1ol", "google": "https://www.google.com/search?q=introducci%C3%B3n%20filosof%C3%ADa%20%C3%A9tica%20c%C3%B3mo%20vivir", "sources": [{"t": "Stanford Encyclopedia of Philosophy", "u": "https://plato.stanford.edu/"}]}, "naturaleza": {"yt": "https://www.youtube.com/results?search_query=ba%C3%B1o%20de%20bosque%20naturaleza%20bienestar%20silencio%20espa%C3%B1ol", "google": "https://www.google.com/search?q=ba%C3%B1o%20de%20bosque%20naturaleza%20bienestar%20silencio", "sources": [{"t": "Naturaleza y salud (estudio Nature)", "u": "https://www.nature.com/articles/s41598-019-44097-3"}]}, "oficio": {"yt": "https://www.youtube.com/results?search_query=habilidades%20manuales%20DIY%20aprender%20a%20hacer%20espa%C3%B1ol", "google": "https://www.google.com/search?q=habilidades%20manuales%20DIY%20aprender%20a%20hacer", "sources": [{"t": "Instructables (proyectos DIY)", "u": "https://www.instructables.com/"}]}, "cocina": {"yt": "https://www.youtube.com/results?search_query=aprender%20a%20cocinar%20t%C3%A9cnicas%20b%C3%A1sicas%20principiantes%20espa%C3%B1ol", "google": "https://www.google.com/search?q=aprender%20a%20cocinar%20t%C3%A9cnicas%20b%C3%A1sicas%20principiantes", "sources": [{"t": "Serious Eats — técnicas", "u": "https://en.wikipedia.org/wiki/List_of_cooking_techniques"}]}, "reparar": {"yt": "https://www.youtube.com/results?search_query=reparaciones%20del%20hogar%20b%C3%A1sicas%20herramientas%20espa%C3%B1ol", "google": "https://www.google.com/search?q=reparaciones%20del%20hogar%20b%C3%A1sicas%20herramientas", "sources": [{"t": "Family Handyman", "u": "https://www.familyhandyman.com/"}]}, "creatividad": {"yt": "https://www.youtube.com/results?search_query=desarrollar%20creatividad%20escribir%20dibujar%20h%C3%A1bito%20creativo%20espa%C3%B1ol", "google": "https://www.google.com/search?q=desarrollar%20creatividad%20escribir%20dibujar%20h%C3%A1bito%20creativo", "sources": [{"t": "Escritura expresiva (APA)", "u": "https://www.apa.org/monitor/jun02/writing"}]}, "lengua": {"yt": "https://www.youtube.com/results?search_query=c%C3%B3mo%20aprender%20un%20idioma%20m%C3%A9todo%20r%C3%A1pido%20espa%C3%B1ol", "google": "https://www.google.com/search?q=c%C3%B3mo%20aprender%20un%20idioma%20m%C3%A9todo%20r%C3%A1pido", "sources": [{"t": "Refold (método de inmersión)", "u": "https://refold.la/"}]}, "metodo-idioma": {"yt": "https://www.youtube.com/results?search_query=input%20comprensible%20repaso%20espaciado%20Anki%20idiomas%20espa%C3%B1ol", "google": "https://www.google.com/search?q=input%20comprensible%20repaso%20espaciado%20Anki%20idiomas", "sources": [{"t": "Stephen Krashen — input comprensible", "u": "https://es.wikipedia.org/wiki/Stephen_Krashen"}]}, "fluidez": {"yt": "https://www.youtube.com/results?search_query=practicar%20conversaci%C3%B3n%20idioma%20fluidez%20hablar%20espa%C3%B1ol", "google": "https://www.google.com/search?q=practicar%20conversaci%C3%B3n%20idioma%20fluidez%20hablar", "sources": [{"t": "Tandem (intercambio de idiomas)", "u": "https://www.tandem.net/"}]}};
+const NODEPLAN = {"mente": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "foco": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "aprender": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "estoicismo": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "psico-normal": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "psico-oscura": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "pensamiento-critico": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "memoria": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "poder": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "leyes-poder": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "carisma": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "oratoria": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "negociacion": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "cuerpo": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "fuerza": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "nutricion": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "sueno": {"cx": 1, "habitDays": 18, "integDays": 40, "minPerDay": 12, "targetHours": 8}, "cardio": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "movilidad": {"cx": 1, "habitDays": 18, "integDays": 40, "minPerDay": 12, "targetHours": 8}, "dinero": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "presupuesto": {"cx": 1, "habitDays": 18, "integDays": 40, "minPerDay": 12, "targetHours": 8}, "inversion": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "ingresos": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "fiscal": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "alma": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "proposito": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "emocional": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "gratitud": {"cx": 1, "habitDays": 18, "integDays": 40, "minPerDay": 12, "targetHours": 8}, "meditacion": {"cx": 1, "habitDays": 18, "integDays": 40, "minPerDay": 12, "targetHours": 8}, "social": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "comunicacion": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "limites": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "liderazgo": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "eros": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "atraccion": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "vinculo-pareja": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "espiritu": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "filosofia": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}, "naturaleza": {"cx": 1, "habitDays": 18, "integDays": 40, "minPerDay": 12, "targetHours": 8}, "oficio": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "cocina": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "reparar": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "creatividad": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "lengua": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "metodo-idioma": {"cx": 2, "habitDays": 30, "integDays": 66, "minPerDay": 25, "targetHours": 28}, "fluidez": {"cx": 3, "habitDays": 45, "integDays": 90, "minPerDay": 45, "targetHours": 68}};
 
 </script>
 <script>
@@ -2550,9 +2697,9 @@ const todayKey=()=>{ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth(
 function keyToDate(k){ const [y,m,d]=k.split("-").map(Number); return new Date(y,m-1,d); }
 function daysBetween(k1,k2){ return Math.round((keyToDate(k2)-keyToDate(k1))/DAY); }
 function daysAgo(k){ return k?daysBetween(k,todayKey()):999; }
-// días distintos con hábito registrado en los nodos, en los últimos N días
+// días distintos con hábito registrado (en toda la historia del nodo)
 function recentHabitDays(habitList,within){
-  const lim=within||14;
+  const lim=within||99999;
   const set=new Set();
   habitList.forEach(h=>{
     const rec=HAB[h]; if(!rec||!rec.days) return;
@@ -2565,24 +2712,45 @@ function recentHabitDays(habitList,within){
 const byId={}; NODES.forEach(n=>byId[n.id]=n);
 function prereqMet(n){ return !n.need || n.need.every(p=>DONE.has(p)); }
 
-// ¿este nodo exige práctica sostenida? (tiene hábitos y no es un nodo raíz/conceptual breve)
 function requiresPractice(n){ return n.habits && n.habits.length>0 && n.tier>0; }
-// días de constancia requeridos para dominar (escala con la importancia del nodo)
-function requiredDays(n){
-  if(!requiresPractice(n)) return 0;
-  if(n.tier===1) return 5;   // rama mayor
-  if(n.tier===3) return 7;   // habilidad profunda
-  return 6;                  // tier 2
+
+// plan del nodo (días/horas según complejidad), con respaldo por defecto
+function nodePlan(n){
+  if(typeof NODEPLAN!=="undefined" && NODEPLAN[n.id]) return NODEPLAN[n.id];
+  // respaldo si faltara
+  return {cx:2, habitDays:30, integDays:66, minPerDay:25, targetHours:28};
 }
-// días de práctica reales acumulados para un nodo
+// días para alcanzar cada etapa
+function habitDays(n){ return nodePlan(n).habitDays; }
+function integDays(n){ return nodePlan(n).integDays; }
+function targetHours(n){ return nodePlan(n).targetHours; }
+// compat: "requiredDays" ahora = días para INTEGRAR (dominar de verdad)
+function requiredDays(n){ return requiresPractice(n)?integDays(n):0; }
+
+// días de práctica reales acumulados (toda la historia)
 function practiceDays(n){
   if(!n.habits) return 0;
-  return recentHabitDays(n.habits, 21);
+  return recentHabitDays(n.habits, 99999);
 }
-// progreso de práctica 0..1
+// horas de práctica acumuladas para un nodo
+function practiceHours(n){
+  if(PRAC[n.id] && typeof PRAC[n.id].hours==="number") return PRAC[n.id].hours;
+  // si el nodo está hecho, puede haber guardado horas en CHECKS o PRAC previo
+  return 0;
+}
+// etapa actual de práctica: "iniciado" | "habito" | "integrado"
+function practiceStage(n){
+  const d=practiceDays(n), h=practiceHours(n);
+  const hd=habitDays(n), id=integDays(n), th=targetHours(n);
+  if(d>=id && h>=th) return "integrado";
+  if(d>=hd) return "habito";
+  return "iniciado";
+}
+// progreso 0..1 hacia integrado (combina días y horas, el menor de los dos)
 function practiceProgress(n){
-  const req=requiredDays(n); if(req===0) return 1;
-  return Math.min(1, practiceDays(n)/req);
+  const dP=Math.min(1, practiceDays(n)/integDays(n));
+  const hP=Math.min(1, practiceHours(n)/Math.max(1,targetHours(n)));
+  return Math.min(dP,hP);
 }
 
 function status(n){
@@ -2592,50 +2760,75 @@ function status(n){
   return "available";
 }
 
-/* ---------- revelado progresivo ----------
-   Al inicio solo se ven el núcleo y las 10 ramas mayores (tier 0 y 1).
-   Los hijos de una rama (tier 2 y 3) aparecen cuando esa rama mayor
-   se pone en juego (empezada o dominada) o cuando el propio nodo ya
-   tiene actividad. Da sensación de descubrimiento y no abruma. */
+/* ---------- revelado progresivo paso a paso ----------
+   Estados de revelado de un nodo:
+   - "full": visible y activo (núcleo, ramas mayores, disponibles, en práctica o hechos)
+   - "ghost": se insinúa en gris — es un siguiente paso cuyos prereqs aún no completas
+             pero al menos uno de sus prereqs ya está revelado en full
+   - "hidden": aún no se muestra (más adelante en el sendero)
+*/
 function rootBranchNode(n){
-  // el nodo tier-1 (rama mayor) al que pertenece este nodo
   return NODES.find(x=>x.branch===n.branch && x.tier===1);
 }
-function isRevealed(n){
-  if(n.tier<=1) return true;                 // núcleo y ramas mayores: siempre
-  if(DONE.has(n.id)||PRAC[n.id]) return true; // ya tiene actividad
-  if(typeof ACTIVE_PATH!=="undefined" && ACTIVE_PATH && ACTIVE_PATH.includes(n.id)) return true; // en ruta activa
+function revealState(n){
+  if(n.tier===0) return "full";                  // núcleo
+  if(n.tier===1) return "full";                  // ramas mayores siempre visibles
+  if(DONE.has(n.id)||PRAC[n.id]) return "full";  // ya con actividad
+  if(prereqMet(n)) return "full";                // todos sus prereqs DOMINADOS → disponible
+
   const root=rootBranchNode(n);
-  if(root && (DONE.has(root.id)||PRAC[root.id])) return true; // su rama está en juego
-  return false;
+  const branchActive = root && (DONE.has(root.id)||PRAC[root.id]);
+  if(!branchActive) return "hidden";             // la rama ni siquiera está abierta
+
+  if(typeof ACTIVE_PATH!=="undefined" && ACTIVE_PATH && ACTIVE_PATH.includes(n.id)) return "ghost";
+
+  const preds = n.need||[];
+  // "siguiente inmediato": todos sus prereqs están al menos EN PRÁCTICA (o dominados)
+  const allPredsInPlay = preds.length>0 && preds.every(pid=>DONE.has(pid)||PRAC[pid]);
+  if(allPredsInPlay) return "full";
+
+  // "insinuado": al menos un prereq está revelado en full (dominado, en práctica o disponible)
+  const anyPredVisible = preds.some(pid=>{
+    const p=byId[pid]; if(!p) return false;
+    return DONE.has(pid) || PRAC[pid] || prereqMet(p);
+  });
+  return anyPredVisible ? "ghost" : "hidden";
 }
+function isRevealed(n){ return revealState(n)!=="hidden"; }
+
 function applyVisibility(){
   NODES.forEach(n=>{
     const el=elById[n.id]; if(!el) return;
+    const rs=revealState(n);
     const hiddenByFilter=HIDDEN.has(n.branch);
-    const hiddenByReveal=!isRevealed(n);
-    el.style.display=(hiddenByFilter||hiddenByReveal)?"none":"";
+    el.style.display=(hiddenByFilter||rs==="hidden")?"none":"";
+    el.classList.toggle("ghost", rs==="ghost" && !hiddenByFilter);
   });
-  // líneas: ocultar las que conecten a un nodo no visible
+  // líneas: visibles solo si ambos extremos están visibles (full o ghost)
   NODES.forEach(n=>{
     if(!n.need) return;
     n.need.forEach(pid=>{
       const ln=document.getElementById(`L_${pid}_${n.id}`);
       if(!ln) return;
-      const vis=isRevealed(n)&&isRevealed(byId[pid])&&!HIDDEN.has(n.branch);
+      const a=revealState(n)!=="hidden", b=revealState(byId[pid])!=="hidden";
+      const vis=a&&b&&!HIDDEN.has(n.branch);
       ln.style.display=vis?"":"none";
+      // línea hacia un ghost: más tenue
+      if(vis && (revealState(n)==="ghost")) ln.style.opacity=".3";
     });
   });
 }
-// detectar nodos recién revelados para animarlos
+// detectar nodos recién pasados a "full" para animarlos
 let REVEALED_SEEN=new Set();
 function animateNewlyRevealed(){
   NODES.forEach(n=>{
-    if(isRevealed(n) && !REVEALED_SEEN.has(n.id)){
-      REVEALED_SEEN.add(n.id);
+    const rs=revealState(n);
+    const key=n.id+":"+rs;
+    if(rs==="full" && !REVEALED_SEEN.has(n.id+":full") && n.tier>1){
+      REVEALED_SEEN.add(n.id+":full");
       const el=elById[n.id];
-      if(el && n.tier>1){
-        el.classList.remove("reveal-anim"); void el.offsetWidth; // reiniciar
+      if(el){
+        el.classList.remove("reveal-anim"); void el.offsetWidth;
         el.classList.add("reveal-anim");
       }
     }
@@ -2771,7 +2964,11 @@ function open(n){
   document.getElementById("sTitle").textContent=n.title;
 
   const st=status(n);
-  const stTxt=st==="done"?"✓ Dominado":st==="practicing"?"◐ En práctica":st==="available"?"● Por empezar":"🔒 Bloqueado";
+  let stTxt;
+  if(st==="done") stTxt="✓ Integrado";
+  else if(st==="practicing"){ const sg=practiceStage(n); stTxt= sg==="integrado"?"◉ Listo para integrar":sg==="habito"?"◐ En hábito":"◐ Iniciado"; }
+  else if(st==="available") stTxt="● Por empezar";
+  else stTxt="🔒 Bloqueado";
   document.getElementById("sMeta").innerHTML=
     timeChip(n.time)+`<span>${stTxt}</span>`+
     (n.branch!=="core"?`<span style="color:${b.css}">${b.name}</span>`:"");
@@ -2784,19 +2981,53 @@ function open(n){
     html+=`<div class="block"><div class="gate">Para inspeccionar a fondo y desbloquear esto primero necesitas completar: <b>${faltan.join(" · ")}</b>. Retrocede y trabaja esos nodos.</div></div>`;
   }
 
-  // barra de constancia (si requiere práctica y está en práctica o disponible)
+  // tarjeta de práctica (etapas Iniciado → En hábito → Integrado)
   if(requiresPractice(n) && st!=="locked" && st!=="done"){
-    const pd=practiceDays(n), req=requiredDays(n);
-    const pct=Math.min(100,pd/req*100);
+    const pd=practiceDays(n), ph=practiceHours(n);
+    const hd=habitDays(n), id=integDays(n), th=targetHours(n);
+    const stage=practiceStage(n);
+    const dPct=Math.min(100,pd/id*100), hPct=Math.min(100,ph/Math.max(1,th)*100);
     const last=PRAC[n.id]?daysAgo(PRAC[n.id].lastTouch):null;
+    const plan=nodePlan(n);
+    const cxLabel = plan.cx===1?"simple":plan.cx===2?"intermedia":"compleja";
+
     let warn="";
     if(st==="practicing" && last!==null && last>=4){
-      warn=`<div class="prac-warn">Llevas <b>${last} días</b> sin registrar su hábito. ¿Lo dejaste ir? Retómalo o sé honesto y déjalo en pausa.</div>`;
+      warn=`<div class="prac-warn">Llevas <b>${last} días</b> sin registrar práctica. ¿Lo dejaste ir? Retómalo o sé honesto y déjalo en pausa.</div>`;
     }
+    // marcador de etapas
+    const stageIdx = stage==="integrado"?2:stage==="habito"?1:0;
+    const stageNames=["Iniciado","En hábito","Integrado"];
+    let stagesHtml=`<div class="stages">`;
+    stageNames.forEach((s,i)=>{
+      stagesHtml+=`<div class="stage-dot ${i<=stageIdx?'on':''} ${i===stageIdx?'cur':''}"><span></span>${s}</div>`;
+    });
+    stagesHtml+=`</div>`;
+
     html+=`<div class="block"><div class="prac-card">
-      <div class="prac-top"><span>Constancia real</span><span id="pracLab">${pd} de ${req} días de práctica real</span></div>
-      <div class="prac-bar"><div class="prac-fill" id="pracFill" style="width:${pct}%"></div></div>
-      <div class="prac-note">Este nodo no se marca con un clic. Solo cuenta como dominado cuando sostienes su hábito ${req} días reales y pasas un chequeo de honestidad. Así sabes que de verdad lo vives.</div>
+      ${stagesHtml}
+      <div class="prac-metric">
+        <div class="pm-row"><span>Días de práctica</span><span id="pracDLab">${pd} / ${id}</span></div>
+        <div class="prac-bar"><div class="prac-fill" id="pracDFill" style="width:${dPct}%"></div>
+          <div class="prac-mark" style="left:${hd/id*100}%" title="En hábito"></div></div>
+      </div>
+      <div class="prac-metric">
+        <div class="pm-row"><span>Horas dedicadas</span><span id="pracHLab">${ph.toFixed(1)} / ${th} h</span></div>
+        <div class="prac-bar"><div class="prac-fill alt" id="pracHFill" style="width:${hPct}%"></div></div>
+      </div>
+      <div class="prac-note">Esta habilidad es de complejidad <b>${cxLabel}</b>. Según la ciencia de formación de hábitos (Lally, UCL), volverse <b>automático</b> toma en promedio ~66 días — más en lo complejo, menos en lo simple. Por eso no se "domina" en unos días: se <b>integra</b> con tiempo real y horas reales. La marca en la barra es cuando pasa a ser <b>hábito</b>.</div>
+      ${st==="practicing"?`<div class="log-today">
+        <div class="lt-q">¿Cuántos minutos practicaste hoy?</div>
+        <div class="lt-opts">
+          <button class="lt-min" data-min="10">10</button>
+          <button class="lt-min" data-min="20">20</button>
+          <button class="lt-min" data-min="30">30</button>
+          <button class="lt-min" data-min="45">45</button>
+          <button class="lt-min" data-min="60">60</button>
+          <button class="lt-min" data-min="90">90</button>
+        </div>
+        <div class="lt-hint" id="ltHint">Toca los minutos que le dedicaste hoy. Cada registro suma día y horas.</div>
+      </div>`:``}
       ${warn}
     </div></div>`;
   }
@@ -2846,6 +3077,23 @@ function open(n){
     html+=`</div></div>`;
   }
 
+  // MATERIAL PARA DOMINAR
+  if(typeof MATERIAL!=="undefined" && MATERIAL[n.id]){
+    const m=MATERIAL[n.id];
+    html+=`<div class="block"><div class="blab">Material para dominar</div>
+      <div class="mat-intro">Recursos para desarrollar esto a fondo. Las fuentes están elegidas por su reputación, pero el criterio final es tuyo: queda con lo que te aporte y descarta lo que no.</div>
+      <div class="mat-grid">`;
+    html+=`<a class="mat-btn yt" href="${m.yt}" target="_blank" rel="noopener"><span>▶</span> Prácticas y videos</a>`;
+    html+=`<a class="mat-btn go" href="${m.google}" target="_blank" rel="noopener"><span>🔍</span> Guías y artículos</a>`;
+    html+=`</div>`;
+    if(m.sources && m.sources.length){
+      html+=`<div class="mat-sources">`;
+      m.sources.forEach(s=>html+=`<a class="mat-src" href="${s.u}" target="_blank" rel="noopener">★ ${s.t} ↗</a>`);
+      html+=`</div>`;
+    }
+    html+=`</div>`;
+  }
+
   // NOTAS
   html+=`<div class="block"><div class="blab">Mis notas y registros</div>
     <textarea class="notebox" id="noteBox" placeholder="Anota tu progreso, reflexiones o lo que vas logrando aquí...">${NOTES[n.id]||""}</textarea></div>`;
@@ -2865,8 +3113,11 @@ function open(n){
   if(st==="locked"){
     foot.innerHTML=`<button class="cta disabled">🔒 Completa los requisitos para marcar</button>`;
   }else if(st==="done"){
-    foot.innerHTML=`<button class="cta undo" id="ctaBtn">Ya no lo mantengo — desmarcar</button>`;
+    foot.innerHTML=`<button class="cta undo" id="ctaBtn">Ya no lo mantengo — desmarcar</button>`+
+      (needsPrac?`<button class="cta-sec" id="ctaReplay">↺ Repasar de nuevo — quiero reforzarlo</button>`:``);
     document.getElementById("ctaBtn").onclick=()=>undoDone(n);
+    const rp=document.getElementById("ctaReplay");
+    if(rp) rp.onclick=()=>replayNode(n);
   }else if(!needsPrac){
     // nodo conceptual / raíz: marcar directo
     foot.innerHTML=`<button class="cta" id="ctaBtn">✓ Marcar como hecho</button>`;
@@ -2875,14 +3126,27 @@ function open(n){
     foot.innerHTML=`<button class="cta" id="ctaBtn">Empezar a practicar</button>`;
     document.getElementById("ctaBtn").onclick=()=>startPractice(n);
   }else{ // practicing
-    const pd=practiceDays(n), req=requiredDays(n), ready=pd>=req;
-    foot.innerHTML=`<button class="cta ${ready?'':'disabled'}" id="ctaBtn">${ready?'✓ Validar y marcar como dominado':'Sigue practicando ('+pd+'/'+req+' días)'}</button>`;
-    document.getElementById("ctaBtn").onclick=()=>{ if(ready) attemptDone(n); else toast(`Te faltan ${req-pd} días de práctica real`); };
+    const pd=practiceDays(n), id=integDays(n), ph=practiceHours(n), th=targetHours(n);
+    const ready=practiceStage(n)==="integrado";
+    let lbl;
+    if(ready){ lbl="✓ Validar y marcar como integrado"; }
+    else{
+      const faltanD=Math.max(0,id-pd), faltanH=Math.max(0,th-ph);
+      lbl=`Sigue: faltan ${faltanD} días y ${faltanH.toFixed(1)} h`;
+    }
+    foot.innerHTML=`<button class="cta ${ready?'':'disabled'}" id="ctaBtn">${lbl}</button>`+
+      `<button class="cta-sec" id="ctaReset">Aún no me siento listo — empezar de nuevo</button>`;
+    document.getElementById("ctaBtn").onclick=()=>{ if(ready) attemptDone(n); else toast(`Aún te falta práctica real para integrarlo`); };
+    document.getElementById("ctaReset").onclick=()=>resetPractice(n);
   }
 
   // wire hábitos
   document.querySelectorAll("#habZone .habit").forEach(el=>{
     el.querySelector(".hx").onclick=()=>toggleHabit(decodeURIComponent(el.dataset.h),el);
+  });
+  // wire registro de minutos de hoy
+  document.querySelectorAll(".lt-min").forEach(btn=>{
+    btn.onclick=()=>logMinutes(n, +btn.dataset.min);
   });
   // wire nota
   const nb=document.getElementById("noteBox");
@@ -2891,11 +3155,123 @@ function open(n){
     nb.oninput=()=>{ clearTimeout(t); t=setTimeout(()=>{ NOTES[n.id]=nb.value; saveNote(); },400); };
   }
 
-  scrim.classList.add("on"); sheet.classList.add("on");
+  openSheetUI();
+}
+
+/* registrar minutos de práctica de hoy para un nodo */
+function logMinutes(n, mins){
+  if(!PRAC[n.id]) return;
+  const tk=todayKey();
+  if(typeof PRAC[n.id].hours!=="number") PRAC[n.id].hours=0;
+  PRAC[n.id].hours += mins/60;
+  PRAC[n.id].lastTouch=tk;
+  // marcar el día de práctica en los hábitos del nodo (sin duplicar)
+  (n.habits||[]).forEach(h=>{
+    const rec=HAB[h]||{count:0,last:null,days:[]};
+    if(!rec.days) rec.days=[];
+    if(!rec.days.includes(tk)){ rec.days.push(tk); rec.count+=1; rec.last=tk; }
+    HAB[h]=rec;
+  });
+  saveHab(); savePrac();
+  const prevStage=PRAC[n.id]._stage;
+  const newStage=practiceStage(n);
+  toast(`+${mins} min registrados hoy ✓`);
+  // si subió de etapa, celebrar
+  if(prevStage && prevStage!==newStage){
+    if(newStage==="habito") toast("¡Ya es un hábito! Sigue para integrarlo ✦");
+    if(newStage==="integrado") toast("¡Integrado! De verdad es parte de ti ✦");
+  }
+  PRAC[n.id]._stage=newStage; savePrac();
+  open(n);
 }
 
 function close(){ scrim.classList.remove("on"); sheet.classList.remove("on"); CUR=null; }
-scrim.onclick=close;
+scrim.onclick=()=>backClose();
+
+/* ============================================================
+   Apertura robusta de enlaces externos.
+   En móvil y en la app instalada (PWA standalone), target="_blank"
+   a veces no abre nada. Interceptamos el toque y abrimos de forma
+   fiable con window.open y un fallback a location.
+   ============================================================ */
+function openExternal(url){
+  if(!url) return;
+  let w=null;
+  try{ w=window.open(url,"_blank","noopener,noreferrer"); }catch(e){}
+  // si el navegador/PWA bloqueó la nueva ventana, navegar en la misma
+  if(!w){ try{ location.href=url; }catch(e){} }
+}
+// captura global: cualquier <a> con http(s) se abre con openExternal
+document.addEventListener("click", function(ev){
+  const a = ev.target.closest && ev.target.closest('a[href^="http"]');
+  if(!a) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  openExternal(a.getAttribute("href"));
+}, true);   // fase de captura, para ganarle a los manejadores de arrastre del panel
+
+
+/* ============================================================
+   Manejo del botón "atrás" del celular.
+   Cada vez que se abre un overlay, registramos un estado en el
+   historial. Al pulsar atrás (popstate), cerramos el overlay de
+   más arriba en vez de salir de la página.
+   ============================================================ */
+let OVERLAY_STACK=[];   // p.ej. ["sheet"], ["sheet","check"]
+let _suppressPop=false;
+
+function isAnyOverlayOpen(){
+  return sheet.classList.contains("on") || checkBox.classList.contains("on") || sosEl.classList.contains("on") || (typeof document.getElementById("legend")!=="undefined" && document.getElementById("legend") && document.getElementById("legend").classList.contains("show")) || document.getElementById("fab").classList.contains("open");
+}
+
+// llamar al ABRIR cualquier overlay
+function pushOverlay(kind){
+  OVERLAY_STACK.push(kind);
+  try{ history.pushState({senda:true, depth:OVERLAY_STACK.length}, ""); }catch(e){}
+}
+// cerrar el overlay superior sin tocar el historial (lo consume popstate)
+function closeTopOverlay(){
+  const kind=OVERLAY_STACK.pop();
+  if(kind==="sheet"){ close(); }
+  else if(kind==="check"){ closeCheckRaw(); }
+  else if(kind==="sos"){ endSosRaw(); }
+  else if(kind==="legend"){ document.getElementById("legend").classList.remove("show"); }
+  else if(kind==="fab"){ document.getElementById("fab").classList.remove("open"); }
+}
+// cuando el usuario cierra con la X o tocando fuera: retrocede el historial
+function backClose(){
+  if(OVERLAY_STACK.length>0){ history.back(); }   // dispara popstate -> closeTopOverlay
+}
+
+window.addEventListener("popstate", ()=>{
+  if(_suppressPop){ _suppressPop=false; return; }
+  if(OVERLAY_STACK.length>0){
+    closeTopOverlay();
+  }
+  // si la pila está vacía, dejamos que el navegador haga lo normal (salir)
+});
+
+// abre/asegura el sheet; el sheet cuenta como UN solo nivel de historial
+function openSheetUI(){
+  const wasOpen=sheet.classList.contains("on");
+  scrim.classList.add("on"); sheet.classList.add("on");
+  if(!wasOpen && !OVERLAY_STACK.includes("sheet")) pushOverlay("sheet");
+}
+function openCheckUI(){
+  const wasOpen=checkBox.classList.contains("on");
+  checkScrim.classList.add("on"); checkBox.classList.add("on");
+  if(!wasOpen) pushOverlay("check");
+}
+function openSosUI(){
+  const wasOpen=sosEl.classList.contains("on");
+  sosEl.classList.add("on");
+  if(!wasOpen) pushOverlay("sos");
+}
+// cierres "crudos" (sin tocar historial) que usa closeTopOverlay
+function closeCheckRaw(){ checkScrim.classList.remove("on"); checkBox.classList.remove("on"); CK_NODE=null; }
+function endSosRaw(){ if(sosTimerInt){clearInterval(sosTimerInt);sosTimerInt=null;} sosEl.classList.remove("on"); }
+
+
 
 /* ---------- rutas guiadas ---------- */
 let ACTIVE_PATH=null;            // ids del camino activo (para resaltar)
@@ -2942,6 +3318,46 @@ function branchStats(){
   });
   return stats;
 }
+/* ---------- evaluación de esfuerzo (sobre/sub) basada en evidencia ----------
+   - Demasiados nodos en práctica a la vez → dispersión / agotamiento de fuerza de voluntad
+   - Nodos en práctica pero casi sin actividad reciente → subesfuerzo (sin repetición no hay hábito)
+   Evidencia: Lally 2009 (la automaticidad requiere repetición constante);
+   recomendación de tomar pocos hábitos a la vez (James Clear); burnout por
+   sobre-disciplina. El "ego depletion" de Baumeister se cita con matiz:
+   replicaciones recientes (2016) lo discuten, por eso no se presenta como ley. */
+function effortStatus(){
+  const practicing=NODES.filter(n=>PRAC[n.id]);
+  if(practicing.length===0) return null;
+  const active=practicing.filter(n=>daysAgo(PRAC[n.id].lastTouch)<=3);
+  if(active.length>=4){
+    return {
+      kind:"over",
+      title:"Cuidado: te estás dispersando",
+      msg:`Tienes <b>${active.length} hábitos nuevos</b> en marcha a la vez. Querer un poco de todo suena bien, pero suele terminar en abandonar todo. Concentra tu energía en 1 o 2 hasta que se asienten; luego suma.`,
+      sci:"Según la ciencia: la fuerza de voluntad se agota cuando la repartes en muchas demandas simultáneas, y la automaticidad de un hábito necesita repetición enfocada (Lally, UCL 2009). Es como el gimnasio: más peso del que aguantas no te hace más fuerte, te lesiona."
+    };
+  }
+  const anyRecent=practicing.some(n=>daysAgo(PRAC[n.id].lastTouch)<=4);
+  if(!anyRecent){
+    const dormido=practicing.length;
+    return {
+      kind:"under",
+      title:"Llevas días sin avanzar de verdad",
+      msg:`Tienes ${dormido} ${dormido===1?"nodo":"nodos"} en práctica, pero ninguno lo has tocado esta semana. Sin repetición no se forma nada — un poco cada día vale más que un esfuerzo enorme y luego nada.`,
+      sci:"Según la ciencia: un hábito se vuelve automático solo con repetición sostenida (en promedio ~66 días, Lally 2009). Saltarte un día no rompe nada; pero semanas sin tocarlo significan empezar casi de cero."
+    };
+  }
+  if(active.length>=1 && active.length<=3){
+    return {
+      kind:"good",
+      title:"Vas en buen ritmo",
+      msg:`Estás trabajando ${active.length} ${active.length===1?"hábito":"hábitos"} con foco. Ese es el punto justo: suficiente para avanzar, no tanto como para dispersarte.`,
+      sci:"Según la ciencia: tomar pocos hábitos a la vez y sostenerlos es lo que mejor predice que se mantengan en el tiempo."
+    };
+  }
+  return null;
+}
+
 function openSummary(){
   CUR=null;
   sheet.style.setProperty("--bcol",BRANCHES.core.css);
@@ -2977,6 +3393,16 @@ function openSummary(){
     <div class="norte-lab">Tu verdadero norte</div>
     <div class="norte-msg">${norteMsg}</div>
   </div>`;
+
+  // AVISO DE ESFUERZO (sobreesfuerzo / subesfuerzo) — basado en evidencia
+  const effort=effortStatus();
+  if(effort){
+    html+=`<div class="effort ${effort.kind}">
+      <div class="effort-lab">${effort.title}</div>
+      <div class="effort-msg">${effort.msg}</div>
+      <div class="effort-sci">${effort.sci}</div>
+    </div>`;
+  }
 
   html+=`<div class="sumhead">Aquí ves cómo se reparte tu desarrollo entre las diez ramas. Equilibrar al hombre completo es trabajar también lo que evitas, no solo lo que se te da bien.</div>`;
 
@@ -3047,7 +3473,7 @@ function openSummary(){
 
   document.getElementById("sBody").innerHTML=html;
   document.getElementById("sFoot").innerHTML=`<button class="cta" id="ctaBtn" style="background:var(--gold)">Seguir construyendo</button>`;
-  document.getElementById("ctaBtn").onclick=close;
+  document.getElementById("ctaBtn").onclick=backClose;
 
   // wire rutas
   document.querySelectorAll(".pc-go").forEach(el=>{
@@ -3058,7 +3484,7 @@ function openSummary(){
     el.onclick=(e)=>{ e.stopPropagation(); const n=byId[el.dataset.goto]; if(n){ close(); centerOn(n.x,n.y,.95); setTimeout(()=>open(n),420); } };
   });
 
-  scrim.classList.add("on"); sheet.classList.add("on");
+  openSheetUI();
 }
 document.getElementById("summary").onclick=openSummary;
 
@@ -3066,12 +3492,13 @@ document.getElementById("summary").onclick=openSummary;
 function startPractice(n){
   const wasTier1=n.tier===1;
   PRAC[n.id]={started:todayKey(), lastTouch:todayKey()};
-  savePrac(); refreshAll(); open(n);
+  savePrac(); refreshAll();
   if(wasTier1){
-    const kids=NODES.filter(x=>x.branch===n.branch && x.tier>1).length;
-    if(kids>0) toast(`Rama abierta: ${kids} caminos nuevos aparecen ✦`);
-    else toast(`Empezaste a practicar: ${n.title}`);
+    // cerrar el panel y mostrar cinemáticamente el siguiente camino que se abre
+    backClose();
+    setTimeout(()=>revealNextPath(n), 360);
   }else{
+    open(n);
     toast(`Empezaste a practicar: ${n.title}`);
   }
 }
@@ -3084,24 +3511,127 @@ function markDone(n){
   const now=levelInfo().lvl;
   saveDone(); savePrac(); refreshAll();
   if(now>prev) toast(`¡Subiste a NIVEL ${now}! ⬆`);
-  else toast(`Dominado: ${n.title} ✓`);
+  else toast(`Integrado: ${n.title} ✓`);
+  // tras dominar, revelar el siguiente paso del sendero si lo hay
+  const newly=NODES.filter(x=>x.branch===n.branch && revealState(x)==="full"
+                              && !DONE.has(x.id) && !PRAC[x.id]
+                              && (x.need||[]).includes(n.id));
+  if(newly.length>0){
+    backClose();
+    setTimeout(()=>revealNextPath(n, newly), 360);
+  }
 }
 function undoDone(n){
   DONE.delete(n.id);
   saveDone(); refreshAll(); open(n);
 }
 
-// intento de marcar dominado: si requiere práctica, validar constancia + check honesto
+/* ---------- repetir / reiniciar un nodo ---------- */
+// limpia los días de práctica registrados para los hábitos de un nodo
+function clearNodeProgress(n){
+  (n.habits||[]).forEach(h=>{ if(HAB[h]){ HAB[h].days=[]; HAB[h].count=0; HAB[h].last=null; } });
+  saveHab();
+}
+// reiniciar práctica (estás practicando, no te sientes listo)
+function resetPractice(n){
+  confirmDialog(
+    "Empezar de nuevo",
+    `Vas a reiniciar tu progreso de práctica de "${n.title}". Tu contador de días vuelve a cero y empiezas limpio. No es un retroceso: es honestidad. ¿Seguimos?`,
+    "Sí, empezar de nuevo",
+    ()=>{
+      clearNodeProgress(n);
+      PRAC[n.id]={started:todayKey(), lastTouch:todayKey()};
+      savePrac(); refreshAll(); open(n);
+      toast("Práctica reiniciada. Tú decides cuándo estás listo.");
+    });
+}
+// repasar de nuevo (ya dominado, quiere reforzar)
+function replayNode(n){
+  confirmDialog(
+    "Repasar de nuevo",
+    `Esto regresa "${n.title}" a práctica para que lo refuerces. No pierdes que ya lo lograste antes — solo decides volver a vivirlo. ¿Seguimos?`,
+    "Sí, volver a practicarlo",
+    ()=>{
+      DONE.delete(n.id);
+      clearNodeProgress(n);
+      PRAC[n.id]={started:todayKey(), lastTouch:todayKey()};
+      saveDone(); savePrac(); refreshAll(); open(n);
+      toast("De vuelta a la práctica. Reforzar también es avanzar.");
+    });
+}
+// diálogo de confirmación reutilizando el modal de check
+function confirmDialog(title, msg, okLabel, onOk){
+  document.getElementById("ckTitle").textContent=title;
+  document.getElementById("ckSub").textContent="Esto es solo para ti.";
+  document.getElementById("ckBody").innerHTML=`<div class="ck-verdict" style="background:rgba(214,169,63,.08);border:1px solid rgba(214,169,63,.3);color:#e0cda0">${msg}</div>`;
+  document.getElementById("ckFoot").innerHTML=
+    `<button class="ckbtn cancel" id="cfCancel">Cancelar</button><button class="ckbtn go" id="cfOk">${okLabel}</button>`;
+  document.getElementById("cfCancel").onclick=closeCheck;
+  document.getElementById("cfOk").onclick=()=>{ closeCheck(); onOk(); };
+  openCheckUI();
+}
+
+/* ---------- animación cinemática del siguiente camino ---------- */
+function revealNextPath(fromNode, targets){
+  // targets: nodos recién disponibles; si no se pasan, calcular los de la rama
+  let next = targets;
+  if(!next){
+    next = NODES.filter(x=>x.branch===fromNode.branch && x.tier>1
+                        && revealState(x)==="full" && !DONE.has(x.id) && !PRAC[x.id]);
+  }
+  if(!next || next.length===0){
+    // no hay siguiente: solo centrar en la rama
+    centerOn(fromNode.x, fromNode.y, .8);
+    return;
+  }
+  // centro entre el nodo origen y los siguientes
+  const xs=[fromNode.x,...next.map(x=>x.x)], ys=[fromNode.y,...next.map(x=>x.y)];
+  const cx=xs.reduce((a,b)=>a+b,0)/xs.length, cy=ys.reduce((a,b)=>a+b,0)/ys.length;
+  // animar cámara hacia ahí con un pequeño zoom-in
+  animateCamera(cx, cy, .92, 520, ()=>{
+    // resaltar los nuevos nodos uno a uno
+    next.forEach((x,i)=>{
+      const el=elById[x.id];
+      if(el) setTimeout(()=>{
+        el.classList.remove("reveal-anim"); void el.offsetWidth; el.classList.add("reveal-anim");
+        spark(el);
+      }, i*180);
+    });
+    const word = next.length===1 ? "Se abre el siguiente paso" : `Se abren ${next.length} caminos nuevos`;
+    toast(`${word} ✦`);
+  });
+}
+// animación suave de cámara (ease) de la posición actual a destino
+function animateCamera(wx, wy, sc, dur, cb){
+  const sx=OX, sy=OY, sScale=SCALE;
+  const tScale=Math.min(MAX,Math.max(MIN,sc));
+  const tx=window.innerWidth/2 - wx*tScale;
+  const ty=window.innerHeight/2 - wy*tScale;
+  const t0=performance.now();
+  function step(now){
+    let p=Math.min(1,(now-t0)/dur);
+    const e=1-Math.pow(1-p,3);  // easeOutCubic
+    OX=sx+(tx-sx)*e; OY=sy+(ty-sy)*e; SCALE=sScale+(tScale-sScale)*e;
+    apply();
+    if(p<1) requestAnimationFrame(step); else if(cb) cb();
+  }
+  requestAnimationFrame(step);
+}
+// destello breve sobre un nodo
+function spark(el){
+  const g=el.querySelector(".glyph"); if(!g) return;
+  g.classList.remove("spark"); void g.offsetWidth; g.classList.add("spark");
+}
+
+// intento de marcar integrado: requiere etapa "integrado" + check honesto
 function attemptDone(n){
   if(!requiresPractice(n)){ markDone(n); open(n); return; }
-  const pd=practiceDays(n), req=requiredDays(n);
-  if(pd<req){
-    // no tiene la constancia: ofrecer continuar practicando
-    toast(`Te faltan ${req-pd} días de práctica real`);
+  if(practiceStage(n)!=="integrado"){
+    toast(`Aún te falta práctica real para integrarlo`);
     open(n);
     return;
   }
-  openCheck(n);   // tiene constancia → check honesto
+  openCheck(n);   // alcanzó la integración → check honesto
 }
 
 const _unusedToggleDone=null;
@@ -3126,18 +3656,7 @@ function toggleHabit(h,el){
   savePrac();
   if(CUR && CUR.habits && CUR.habits.includes(h)) refreshPracticeBar(CUR);
 }
-function refreshPracticeBar(n){
-  const bar=document.getElementById("pracFill");
-  const lab=document.getElementById("pracLab");
-  if(!bar) return;
-  const pd=practiceDays(n), req=requiredDays(n);
-  bar.style.width=Math.min(100,pd/req*100)+"%";
-  if(lab) lab.textContent=`${pd} de ${req} días de práctica real`;
-  const cta=document.getElementById("ctaBtn");
-  if(cta && pd>=req && cta.classList.contains("disabled")){
-    cta.classList.remove("disabled"); cta.textContent="✓ Validar y marcar como dominado";
-  }
-}
+function refreshPracticeBar(n){ if(CUR===n) open(n); }
 
 /* ---------- check honesto ---------- */
 const checkScrim=document.getElementById("checkScrim");
@@ -3186,9 +3705,9 @@ function openCheck(n){
   });
   document.getElementById("ckCancel").onclick=closeCheck;
   document.getElementById("ckSubmit").onclick=submitCheck;
-  checkScrim.classList.add("on"); checkBox.classList.add("on");
+  openCheckUI();
 }
-function closeCheck(){ checkScrim.classList.remove("on"); checkBox.classList.remove("on"); CK_NODE=null; }
+function closeCheck(){ if(OVERLAY_STACK[OVERLAY_STACK.length-1]==="check"){ backClose(); } else { closeCheckRaw(); } }
 function submitCheck(){
   const qs=honestyQuestions(CK_NODE);
   if(Object.keys(CK_ANS).length<qs.length){ toast("Responde las tres con sinceridad"); return; }
@@ -3202,8 +3721,8 @@ function submitCheck(){
   const foot=document.getElementById("ckFoot");
   const body=document.getElementById("ckBody");
   if(pass){
-    body.innerHTML=`<div class="ck-verdict pass">Se nota que esto ya es tuyo. No lo marcaste por avanzar, lo viviste. Eso es exactamente de lo que se trata. Queda registrado como <b>dominado</b>.</div>`;
-    foot.innerHTML=`<button class="ckbtn go" id="ckDone">Marcar como dominado ✓</button>`;
+    body.innerHTML=`<div class="ck-verdict pass">Se nota que esto ya es tuyo. No lo marcaste por avanzar, lo viviste. Eso es exactamente de lo que se trata. Queda registrado como <b>integrado</b> — parte de ti.</div>`;
+    foot.innerHTML=`<button class="ckbtn go" id="ckDone">Marcar como integrado ✓</button>`;
     document.getElementById("ckDone").onclick=()=>{ closeCheck(); markDone(n); open(n); };
   }else{
     body.innerHTML=`<div class="ck-verdict fail">Tus respuestas dicen que esto todavía no está asentado — y reconocerlo es lo más valioso que puedes hacer. No es un fracaso: es honestidad. Sigue practicándolo unos días más y vuelve cuando de verdad sea parte de ti. Nadie gana saltándose esto, y menos tú.</div>`;
@@ -3227,6 +3746,37 @@ async function loadVice(){
   try{ const v=await storeGet(KEY_VICE); if(v) VICE=JSON.parse(v); }catch(e){}
 }
 const saveVice=()=>save(KEY_VICE,VICE);
+
+/* ---- fichas de recompensa ----
+   Ganas 1 ficha por cada día distinto en que registraste práctica en CUALQUIER
+   nodo (días totales de práctica). Gastarlas se descuenta de ese total. */
+const KEY_REWARD="senda_reward";
+let REWARD={spent:0, log:[]};   // fichas gastadas y registro
+async function loadReward(){
+  try{ const v=await storeGet(KEY_REWARD); if(v) REWARD=JSON.parse(v); }catch(e){}
+  if(typeof REWARD.spent!=="number") REWARD.spent=0;
+  if(!REWARD.log) REWARD.log=[];
+}
+const saveReward=()=>save(KEY_REWARD,REWARD);
+// días totales distintos con práctica registrada (en toda la historia, todos los hábitos)
+function totalPracticeDays(){
+  const set=new Set();
+  Object.values(HAB).forEach(r=>{ (r.days||[]).forEach(d=>set.add(d)); });
+  return set.size;
+}
+function rewardTokens(){
+  return Math.max(0, totalPracticeDays() - (REWARD.spent||0));
+}
+function spendReward(rwId){
+  const rw=REWARD_DEFS.find(x=>x.id===rwId); if(!rw) return;
+  if(rewardTokens()<rw.cost){ toast(`Te faltan fichas — gánalas practicando`); return; }
+  REWARD.spent=(REWARD.spent||0)+rw.cost;
+  REWARD.log.push({date:todayKey(), name:rw.name, cost:rw.cost});
+  saveReward();
+  toast(`Disfrútalo sin culpa: ${rw.name} ✦`);
+  openVice();
+}
+
 
 function viceRec(id){
   if(!VICE[id]){
@@ -3278,40 +3828,86 @@ function triggerCounts(id){
 
 /* ---- panel principal del módulo (en el sheet) ---- */
 let CUR_VICE=null;
+// Menú principal: lista de hábitos a dominar + recompensas
 function openVice(){
-  const id=VICE_DEFS[0].id;   // por ahora un vicio (lujuría); estructura lista para más
+  CUR=null; CUR_VICE=null;
+  sheet.style.setProperty("--bcol","#d6a93f");
+  document.getElementById("sEyebrow").textContent="DOMINIO DE UNO MISMO";
+  document.getElementById("sTitle").textContent="Lo que quiero dominar";
+  const totalClean=VICE_DEFS.reduce((a,v)=>a+currentStreak(v.id).days,0);
+  document.getElementById("sMeta").innerHTML=`<span>${VICE_DEFS.length} frentes</span><span>${rewardTokens()} fichas de recompensa</span>`;
+
+  let html=`<div class="sumhead">Estos son los impulsos que decides dominar. Algunos se trabajan dejándolos (vicio); otros no son malos en sí, solo hay que <b>equilibrarlos</b> para que no te controlen. Toca uno para entrar.</div>`;
+
+  // lista de hábitos
+  VICE_DEFS.forEach(def=>{
+    const st=currentStreak(def.id).days;
+    const r=VICE[def.id];
+    const kindLbl = def.kind==="vicio" ? "Dejarlo" : "Equilibrarlo";
+    const sub = r ? `${st} ${st===1?'día':'días'} en racha · récord ${r.best||0}` : "Sin empezar";
+    html+=`<div class="vice-item" data-v="${def.id}">
+      <div class="vi-ico">${def.icon}</div>
+      <div class="vi-body"><div class="vi-name">${def.name}</div><div class="vi-sub">${sub}</div></div>
+      <div class="vi-kind ${def.kind}">${kindLbl}</div>
+    </div>`;
+  });
+
+  // sección de recompensas
+  html+=`<div class="block"><div class="blab">Recompensas que te ganas</div>
+    <div class="rew-intro">Descansar y disfrutar <b>no es el enemigo</b> — el problema es hacerlo para huir. Aquí ganas <b>fichas</b> por cada día que practicas tus hábitos del árbol, y las gastas en ocio <b>sin culpa</b>, porque te lo ganaste. Eso es lo que hace sostenible la disciplina.</div>
+    <div class="rew-balance">Tienes <b>${rewardTokens()}</b> ficha${rewardTokens()===1?'':'s'} disponible${rewardTokens()===1?'':'s'}</div>
+    <div class="rew-grid">`;
+  REWARD_DEFS.forEach(rw=>{
+    const can=rewardTokens()>=rw.cost;
+    html+=`<button class="rew-card ${can?'':'lock'}" data-rw="${rw.id}">
+      <span class="rew-ico">${rw.icon}</span>
+      <span class="rew-name">${rw.name}</span>
+      <span class="rew-cost">${rw.cost} ✦</span>
+    </button>`;
+  });
+  html+=`</div><div class="rew-note">Ganas 1 ficha por cada día que registres práctica en cualquier nodo. Gastarlas es decisión tuya y está bien.</div></div>`;
+
+  document.getElementById("sBody").innerHTML=html;
+  document.getElementById("sFoot").innerHTML=`<button class="cta" id="ctaBtn" style="background:#d6a93f">Cerrar</button>`;
+  document.getElementById("ctaBtn").onclick=backClose;
+  document.querySelectorAll(".vice-item").forEach(el=>{
+    el.onclick=()=>openViceDetail(el.dataset.v);
+  });
+  document.querySelectorAll(".rew-card").forEach(el=>{
+    el.onclick=()=>spendReward(el.dataset.rw);
+  });
+  openSheetUI();
+}
+
+function openViceDetail(id){
   CUR_VICE=id; CUR=null;
   const def=VICE_DEFS.find(v=>v.id===id);
   const r=viceRec(id);
   const {days,since}=currentStreak(id);
   sheet.style.setProperty("--bcol","#d6a93f");
-  document.getElementById("sEyebrow").textContent="DOMINIO DE UNO MISMO";
+  document.getElementById("sEyebrow").textContent= def.kind==="vicio"?"DOMINIO · DEJARLO":"DOMINIO · EQUILIBRARLO";
   document.getElementById("sTitle").textContent=def.name;
-  document.getElementById("sMeta").innerHTML=`<span>Mejor marca: <b>${r.best} días</b></span><span>${r.relapses.length} recaídas registradas</span>`;
+  document.getElementById("sMeta").innerHTML=`<span>Mejor marca: <b>${r.best} días</b></span><span>${r.relapses.length} ${def.kind==="vicio"?"recaídas":"deslices"}</span>`;
 
   let html="";
-  // contador grande
   const markedToday=r.clean.includes(todayKey());
+  const cleanWord = def.kind==="vicio" ? "limpio" : "en control";
   html+=`<div class="vice-counter">
     <div class="vc-num">${days}</div>
-    <div class="vc-lab">${days===1?"día limpio":"días limpios"}${r.best>0?` · récord ${r.best}`:""}</div>
+    <div class="vc-lab">${days===1?"día":"días"} ${cleanWord}${r.best>0?` · récord ${r.best}`:""}</div>
   </div>`;
 
-  // botón día limpio
   if(markedToday){
-    html+=`<div class="vice-today done">✓ Hoy ya lo registraste como día limpio. Bien.</div>`;
+    html+=`<div class="vice-today done">✓ Hoy ya lo registraste como un buen día. Bien.</div>`;
   }else{
-    html+=`<button class="vice-clean" id="viceClean">✓ Hoy fue un día limpio</button>`;
+    html+=`<button class="vice-clean" id="viceClean">✓ Hoy fue un día ${cleanWord}</button>`;
   }
 
-  // SOS
-  html+=`<button class="vice-sos" id="viceSos">Tengo el impulso ahora — ayúdame</button>`;
+  html+=`<button class="vice-sos" id="viceSos">${def.kind==="vicio"?"Tengo el impulso ahora — ayúdame":"Siento el impulso — ayúdame a parar"}</button>`;
 
-  // por qué
   html+=`<div class="block"><div class="blab">Mi porqué</div>
-    <textarea class="notebox" id="viceWhy" placeholder="¿Por qué quiero dominar esto?">${r.why||""}</textarea></div>`;
+    <textarea class="notebox" id="viceWhy" placeholder="¿Por qué quiero dominar esto?">${r.why||def.why_default||""}</textarea></div>`;
 
-  // detonantes / patrones
   const tc=triggerCounts(id);
   if(tc.length){
     html+=`<div class="block"><div class="blab">Tus detonantes · patrones</div><div class="trigs">`;
@@ -3324,12 +3920,11 @@ function openVice(){
     html+=`</div><div class="trig-note">Reconocer qué lo dispara es la mitad del trabajo. Cuando sientas venir uno de estos, es tu señal para activar el plan, no para pelear con la mente.</div></div>`;
   }
 
-  // registrar recaída (sin culpa)
-  html+=`<div class="block"><div class="blab">Si recaíste</div>
-    <div class="relapse-intro">Una recaída no borra tu progreso ni te define. Es un dato para aprender. Registrarla con honestidad es lo que rompe el ciclo de culpa.</div>
-    <button class="vice-relapse" id="viceRelapse">Registrar una recaída</button></div>`;
+  const relWord = def.kind==="vicio"?"recaída":"desliz";
+  html+=`<div class="block"><div class="blab">Si ${def.kind==="vicio"?"recaíste":"caíste"}</div>
+    <div class="relapse-intro">Un ${relWord} no borra tu progreso ni te define. Es un dato para aprender. Registrarlo con honestidad es lo que rompe el ciclo de culpa.</div>
+    <button class="vice-relapse" id="viceRelapse">Registrar un ${relWord}</button></div>`;
 
-  // historial corto
   if(r.relapses.length){
     html+=`<div class="block"><div class="blab">Últimos registros</div><div class="rlog">`;
     r.relapses.slice(-4).reverse().forEach(x=>{
@@ -3339,16 +3934,16 @@ function openVice(){
   }
 
   document.getElementById("sBody").innerHTML=html;
-  document.getElementById("sFoot").innerHTML=`<button class="cta" id="ctaBtn" style="background:#d6a93f">Cerrar</button>`;
-  document.getElementById("ctaBtn").onclick=close;
+  document.getElementById("sFoot").innerHTML=`<button class="cta" id="ctaBtn" style="background:#d6a93f">Volver</button>`;
+  document.getElementById("ctaBtn").onclick=openVice;
 
-  const cl=document.getElementById("viceClean"); if(cl) cl.onclick=()=>{ markCleanDay(id); openVice(); toast("Día limpio registrado ✓"); };
-  document.getElementById("viceSos").onclick=()=>{ close(); startSos(id); };
+  const cl=document.getElementById("viceClean"); if(cl) cl.onclick=()=>{ markCleanDay(id); openViceDetail(id); toast("Día registrado ✓"); };
+  document.getElementById("viceSos").onclick=()=>{ startSos(id); };
   document.getElementById("viceRelapse").onclick=()=>openRelapse(id);
   const wy=document.getElementById("viceWhy");
   if(wy){ let t; wy.oninput=()=>{ clearTimeout(t); t=setTimeout(()=>{ viceRec(id).why=wy.value; saveVice(); },400); }; }
 
-  scrim.classList.add("on"); sheet.classList.add("on");
+  openSheetUI();
 }
 document.getElementById("vice").onclick=openVice;
 
@@ -3372,10 +3967,10 @@ function openRelapse(id){
   document.getElementById("rCancel").onclick=closeCheck;
   document.getElementById("rSave").onclick=()=>{
     logRelapse(id, sel, document.getElementById("rNote").value.trim());
-    closeCheck(); openVice();
+    closeCheck(); openViceDetail(id);
     toast("Registrado. Mañana es un nuevo día limpio.");
   };
-  checkScrim.classList.add("on"); checkBox.classList.add("on");
+  openCheckUI();
 }
 
 /* ---- modo SOS: urge surfing ---- */
@@ -3384,11 +3979,11 @@ const sosInner=document.getElementById("sosInner");
 let sosTimerInt=null;
 function startSos(id){
   sosStep1(id);
-  sosEl.classList.add("on");
+  openSosUI();
 }
 function endSos(){
-  if(sosTimerInt){clearInterval(sosTimerInt);sosTimerInt=null;}
-  sosEl.classList.remove("on");
+  if(OVERLAY_STACK[OVERLAY_STACK.length-1]==="sos"){ backClose(); }
+  else { endSosRaw(); }
 }
 function sosStep1(id){
   if(sosTimerInt){clearInterval(sosTimerInt);sosTimerInt=null;}
@@ -3441,7 +4036,7 @@ function sosStep4(id){
     <div class="sos-p">Acabas de demostrarte que el impulso pasa y que tú decides, no él. Cada vez que lo haces, el patrón se debilita. Esto es exactamente entrenar el músculo del autocontrol.</div>
     ${r.why?`<div class="sos-quote">Tu porqué: ${r.why}</div>`:""}
     <button class="sos-btn main" id="sosFinish">Volver, más fuerte</button>`;
-  document.getElementById("sosFinish").onclick=()=>{ endSos(); openVice(); };
+  document.getElementById("sosFinish").onclick=()=>{ endSos(); openViceDetail(id); };
 }
 
 /* ============================================================
@@ -3505,12 +4100,12 @@ function openSkills(){
 
   document.getElementById("sBody").innerHTML=html;
   document.getElementById("sFoot").innerHTML=`<button class="cta" id="ctaBtn" style="background:#7fcec2;color:#06120f">Cerrar</button>`;
-  document.getElementById("ctaBtn").onclick=close;
+  document.getElementById("ctaBtn").onclick=backClose;
   document.querySelectorAll(".sk-card").forEach(el=>{
     el.onclick=()=>{ const s=SKILLS.find(x=>x.id===el.dataset.sk); if(s && skUnlocked(s)) openSkillDetail(s); else if(s) toast(`Llegas a nivel ${s.req} y se desbloquea`); };
   });
 
-  scrim.classList.add("on"); sheet.classList.add("on");
+  openSheetUI();
 }
 document.getElementById("skills").onclick=openSkills;
 
@@ -3561,7 +4156,7 @@ function openSkillDetail(s){
     toast("Prueba de trabajo registrada ✓");
     openSkillDetail(s);
   };
-  scrim.classList.add("on"); sheet.classList.add("on");
+  openSheetUI();
 }
 
 /* ---------- toast ---------- */
@@ -3666,16 +4261,88 @@ document.getElementById("introGo").onclick=()=>{
 async function start(){
   await loadState();
   await loadVice();
+  await loadReward();
   await loadSkills();
   build();
   // marcar como ya vistos los nodos visibles al cargar (no se animan)
-  NODES.forEach(n=>{ if(isRevealed(n)) REVEALED_SEEN.add(n.id); });
+  NODES.forEach(n=>{ if(revealState(n)==="full") REVEALED_SEEN.add(n.id+":full"); });
   buildLegend();
   centerOn(0,0,.58);
   renderLevel();
   applyVisibility();
+  setTimeout(checkReminders, 1400);   // recordatorios suaves al abrir
 }
 start();
+
+/* ============================================================
+   RECORDATORIOS LOCALES (funcionan con la app abierta)
+   Revisan tu estado y muestran un aviso accionable suave.
+   ============================================================ */
+function buildReminders(){
+  const out=[];
+  // 1) hábitos de nodos en práctica sin registrar hoy
+  const tk=todayKey();
+  const practicing=NODES.filter(n=>PRAC[n.id]);
+  let pendingHabits=0;
+  practicing.forEach(n=>{
+    (n.habits||[]).forEach(h=>{ const r=HAB[h]; if(!r||r.last!==tk) pendingHabits++; });
+  });
+  if(pendingHabits>0){
+    out.push({icon:"◐", text:`Tienes ${pendingHabits} hábito${pendingHabits>1?'s':''} sin registrar hoy en lo que practicas.`, action:"resumen"});
+  }
+  // 2) nodos en práctica abandonados (4+ días sin tocar)
+  const stale=practicing.map(n=>({n,d:daysAgo(PRAC[n.id].lastTouch)})).filter(o=>o.d>=4);
+  if(stale.length>0){
+    const peor=stale.sort((a,b)=>b.d-a.d)[0];
+    out.push({icon:"⚠", text:`Dejaste "${peor.n.title}" ${peor.d} días sin tocar. ¿Lo retomas?`, action:"goto", node:peor.n.id});
+  }
+  // 3) vicio: si hay racha activa y hoy no registraste día limpio
+  if(typeof VICE_DEFS!=="undefined"){
+    VICE_DEFS.forEach(def=>{
+      const r=VICE[def.id]; if(!r) return;
+      const st=currentStreak(def.id);
+      if(st.days>0 && !(r.clean||[]).includes(tk)){
+        out.push({icon:"🛡", text:`Llevas ${st.days} día${st.days>1?'s':''} limpio. Marca el de hoy cuando puedas.`, action:"vice"});
+      }
+    });
+  }
+  // 4) sobreesfuerzo: demasiados hábitos activos a la vez
+  const eff=effortStatus();
+  if(eff && eff.kind==="over"){
+    out.push({icon:"⚡", text:"Tienes muchos hábitos a la vez. Concéntrate en 1 o 2 para no dispersarte.", action:"resumen"});
+  }
+  return out;
+}
+function checkReminders(){
+  const rem=buildReminders();
+  if(rem.length===0) return;
+  showReminderCard(rem);
+}
+function showReminderCard(rem){
+  let host=document.getElementById("reminderCard");
+  if(!host){
+    host=document.createElement("div"); host.id="reminderCard"; document.body.appendChild(host);
+  }
+  let html=`<div class="rem-head"><span>Recordatorios</span><span class="rem-x" id="remX">✕</span></div>`;
+  rem.slice(0,3).forEach((r,i)=>{
+    html+=`<div class="rem-it" data-i="${i}"><span class="rem-ic">${r.icon}</span><span class="rem-tx">${r.text}</span></div>`;
+  });
+  host.innerHTML=html;
+  host.classList.add("show");
+  document.getElementById("remX").onclick=()=>host.classList.remove("show");
+  host.querySelectorAll(".rem-it").forEach(el=>{
+    const r=rem[+el.dataset.i];
+    el.onclick=()=>{
+      host.classList.remove("show");
+      if(r.action==="resumen") openSummary();
+      else if(r.action==="vice") openVice();
+      else if(r.action==="goto" && r.node){ const n=byId[r.node]; if(n){ centerOn(n.x,n.y,.95); setTimeout(()=>open(n),300);} }
+    };
+  });
+  // auto-ocultar a los 9s
+  setTimeout(()=>{ if(host) host.classList.remove("show"); }, 9000);
+}
+
 
 })();
 
