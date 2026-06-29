@@ -256,6 +256,26 @@
   .bk-btn.dl{background:rgba(201,168,74,.1);border-color:rgba(201,168,74,.4);color:var(--gold)}
   .bk-btn.up{background:#0e1218;color:var(--muted)}
   .bk-btn:active{transform:scale(.98)}
+
+  /* portal / mapa de crecimiento */
+  .portal-card{background:#0e1218;border:1px solid var(--line);border-radius:13px;padding:15px}
+  .portal-lbl{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:9px}
+  .portal-desc{font-size:13px;color:#ccc4ae;line-height:1.6;margin-bottom:14px}
+  .portal-desc b{color:var(--ink)}
+  .portal-bar-row{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-bottom:6px}
+  .growth{display:flex;flex-direction:column;gap:8px}
+  .g-item{display:flex;align-items:center;gap:11px;background:#0e1218;border:1px solid var(--line);
+    border-radius:11px;padding:11px 13px;cursor:pointer;transition:.15s}
+  .g-item:active{transform:scale(.99);background:#11161e}
+  .g-ico{flex:none;width:30px;height:30px;border-radius:8px;background:#151a22;display:grid;place-items:center;font-size:15px}
+  .g-name{flex:1;font-size:13.5px;color:var(--ink)}
+  .g-tag{flex:none;font-size:9.5px;padding:3px 8px;border-radius:20px;letter-spacing:.03em}
+  .g-done .g-tag{background:rgba(76,169,107,.16);color:#8fd0a5}
+  .g-done .g-name{color:var(--muted)}
+  .g-prac .g-tag{background:rgba(214,169,63,.16);color:var(--gold)}
+  .g-open .g-tag{background:rgba(91,141,217,.14);color:#9fc0ec}
+  .g-lock{opacity:.5}
+  .g-lock .g-tag{background:#1a1e26;color:#666}
   /* prereq aviso */
   .gate{font-size:12.5px;color:var(--r-poder);background:rgba(192,71,63,.08);
     border:1px solid rgba(192,71,63,.3);border-radius:11px;padding:10px 12px;line-height:1.5}
@@ -2800,35 +2820,54 @@ function recentHabitDays(habitList,within){
 
 /* ---------- índices ---------- */
 const byId={}; NODES.forEach(n=>byId[n.id]=n);
-function prereqMet(n){ return !n.need || n.need.every(p=>DONE.has(p)); }
+function prereqMet(n){
+  if(!n.need) return true;
+  return n.need.every(p=>{
+    if(DONE.has(p)) return true;
+    // si el prerequisito es un portal (rama mayor) que ya está abierto/en juego, cuenta
+    const pn=byId[p];
+    if(pn && isPortal(pn) && (PRAC[p] || portalDoneCount(pn).done>0)) return true;
+    return false;
+  });
+}
 
-function requiresPractice(n){ return n.habits && n.habits.length>0 && n.tier>0; }
+// ¿es un portal (rama mayor)? Los portales no se practican solos: agrupan ramificaciones.
+function isPortal(n){ return n.tier===1; }
+function portalChildren(n){ return NODES.filter(x=>x.branch===n.branch && x.tier>1); }
+
+// un nodo requiere práctica propia si tiene hábitos, NO es portal, y no es raíz
+function requiresPractice(n){ return n.habits && n.habits.length>0 && n.tier>1; }
+
+// progreso de un portal = fracción de sus ramificaciones integradas (0..1)
+function portalProgress(n){
+  const kids=portalChildren(n);
+  if(kids.length===0) return 0;
+  const done=kids.filter(k=>DONE.has(k.id)).length;
+  return done/kids.length;
+}
+function portalDoneCount(n){
+  const kids=portalChildren(n);
+  return { done: kids.filter(k=>DONE.has(k.id)).length, total: kids.length };
+}
 
 // plan del nodo (días/horas según complejidad), con respaldo por defecto
 function nodePlan(n){
   if(typeof NODEPLAN!=="undefined" && NODEPLAN[n.id]) return NODEPLAN[n.id];
-  // respaldo si faltara
   return {cx:2, habitDays:30, integDays:66, minPerDay:25, targetHours:28};
 }
-// días para alcanzar cada etapa
 function habitDays(n){ return nodePlan(n).habitDays; }
 function integDays(n){ return nodePlan(n).integDays; }
 function targetHours(n){ return nodePlan(n).targetHours; }
-// compat: "requiredDays" ahora = días para INTEGRAR (dominar de verdad)
 function requiredDays(n){ return requiresPractice(n)?integDays(n):0; }
 
-// días de práctica reales acumulados (toda la historia)
 function practiceDays(n){
   if(!n.habits) return 0;
   return recentHabitDays(n.habits, 99999);
 }
-// horas de práctica acumuladas para un nodo
 function practiceHours(n){
   if(PRAC[n.id] && typeof PRAC[n.id].hours==="number") return PRAC[n.id].hours;
-  // si el nodo está hecho, puede haber guardado horas en CHECKS o PRAC previo
   return 0;
 }
-// etapa actual de práctica: "iniciado" | "habito" | "integrado"
 function practiceStage(n){
   const d=practiceDays(n), h=practiceHours(n);
   const hd=habitDays(n), id=integDays(n), th=targetHours(n);
@@ -2836,7 +2875,6 @@ function practiceStage(n){
   if(d>=hd) return "habito";
   return "iniciado";
 }
-// progreso 0..1 hacia integrado (combina días y horas, el menor de los dos)
 function practiceProgress(n){
   const dP=Math.min(1, practiceDays(n)/integDays(n));
   const hP=Math.min(1, practiceHours(n)/Math.max(1,targetHours(n)));
@@ -2846,6 +2884,13 @@ function practiceProgress(n){
 function status(n){
   if(DONE.has(n.id)) return "done";
   if(!prereqMet(n)) return "locked";
+  // un portal se considera "integrado" automáticamente cuando todos sus hijos lo están
+  if(isPortal(n)){
+    const {done,total}=portalDoneCount(n);
+    if(total>0 && done===total) return "done";
+    if(PRAC[n.id] || done>0) return "practicing";
+    return "available";
+  }
   if(PRAC[n.id]) return "practicing";
   return "available";
 }
@@ -3055,7 +3100,13 @@ function open(n){
 
   const st=status(n);
   let stTxt;
-  if(st==="done") stTxt="✓ Integrado";
+  if(isPortal(n)){
+    const {done,total}=portalDoneCount(n);
+    if(done===total && total>0) stTxt="✓ Rama integrada";
+    else if(PRAC[n.id]||done>0) stTxt=`◐ En camino · ${done}/${total}`;
+    else stTxt="● Rama por abrir";
+  }
+  else if(st==="done") stTxt="✓ Integrado";
   else if(st==="practicing"){ const sg=practiceStage(n); stTxt= sg==="integrado"?"◉ Listo para integrar":sg==="habito"?"◐ En hábito":"◐ Iniciado"; }
   else if(st==="available") stTxt="● Por empezar";
   else stTxt="🔒 Bloqueado";
@@ -3069,6 +3120,41 @@ function open(n){
   if(st==="locked"){
     const faltan=n.need.filter(p=>!DONE.has(p)).map(p=>byId[p]?byId[p].title:p);
     html+=`<div class="block"><div class="gate">Para inspeccionar a fondo y desbloquear esto primero necesitas completar: <b>${faltan.join(" · ")}</b>. Retrocede y trabaja esos nodos.</div></div>`;
+  }
+
+  // MAPA DE CRECIMIENTO (solo portales / ramas mayores)
+  if(isPortal(n)){
+    const kids=portalChildren(n);
+    const {done,total}=portalDoneCount(n);
+    const pct=total>0?Math.round(done/total*100):0;
+    html+=`<div class="block"><div class="portal-card">
+      <div class="portal-lbl">Esta rama no se entrena sola</div>
+      <div class="portal-desc">"${n.title}" es el conjunto de habilidades de abajo. La desarrollas <b>integrando sus ramificaciones</b>, una por una. No hay un "hábito de ${n.title.toLowerCase()}" suelto: hay foco, hay constancia, hay cada pieza concreta.</div>
+      <div class="portal-bar-row"><span>Progreso de la rama</span><span>${done}/${total} integradas</span></div>
+      <div class="prac-bar"><div class="prac-fill" id="pracDFill" style="width:${pct}%;background:linear-gradient(90deg,${b.css}88,${b.css})"></div></div>
+    </div></div>`;
+
+    // lista de ramificaciones con su estado y orden de crecimiento
+    html+=`<div class="block"><div class="blab">Mapa de crecimiento</div><div class="growth">`;
+    // ordenar: primero las disponibles/en progreso, luego bloqueadas, al final hechas
+    const ordered=kids.slice().sort((a,b2)=>{
+      const rank=x=>{ if(DONE.has(x.id))return 3; if(PRAC[x.id])return 0; if(prereqMet(x))return 1; return 2; };
+      return rank(a)-rank(b2);
+    });
+    ordered.forEach(k=>{
+      const ks=status(k);
+      let tag, cls;
+      if(ks==="done"){tag="✓ integrada";cls="g-done";}
+      else if(ks==="practicing"){const sg=practiceStage(k);tag=sg==="habito"?"en hábito":sg==="integrado"?"lista":"en práctica";cls="g-prac";}
+      else if(ks==="available"){tag="puedes empezar";cls="g-open";}
+      else {tag="bloqueada";cls="g-lock";}
+      html+=`<div class="g-item ${cls}" data-goto="${k.id}">
+        <span class="g-ico" style="color:${b.css}">${k.icon}</span>
+        <span class="g-name">${k.title}</span>
+        <span class="g-tag">${tag}</span>
+      </div>`;
+    });
+    html+=`</div></div>`;
   }
 
   // tarjeta de práctica (etapas Iniciado → En hábito → Integrado)
@@ -3126,7 +3212,7 @@ function open(n){
   html+=`<div class="block"><div class="blab">Por qué se hace</div><div class="why">${n.why}</div></div>`;
 
   // TU ACCIÓN DE HOY (concreta, no ambigua) — rota según el día
-  if((n.steps&&n.steps.length) || (n.habits&&n.habits.length)){
+  if(!isPortal(n) && ((n.steps&&n.steps.length) || (n.habits&&n.habits.length))){
     const pool=[].concat(n.steps||[], (n.habits||[]).map(h=>"Hoy: "+h));
     if(pool.length){
       // índice estable por día: cambia cada día pero es el mismo durante el día
@@ -3149,7 +3235,7 @@ function open(n){
   }
 
   // PASOS
-  if(n.steps&&n.steps.length){
+  if(!isPortal(n) && n.steps&&n.steps.length){
     html+=`<div class="block"><div class="blab">Cómo desarrollarla</div><div class="stepwrap">`;
     n.steps.forEach((s,i)=>{html+=`<div class="step"><span class="n">${i+1}</span><span>${s}</span></div>`;});
     html+=`</div></div>`;
@@ -3170,7 +3256,7 @@ function open(n){
   }
 
   // HÁBITOS
-  if(n.habits&&n.habits.length){
+  if(!isPortal(n) && n.habits&&n.habits.length){
     html+=`<div class="block"><div class="blab">Hábitos para rastrear</div><div class="habits" id="habZone">`;
     n.habits.forEach((h,i)=>{
       const rec=HAB[h]||{count:0,last:null};
@@ -3247,7 +3333,21 @@ function open(n){
   // footer
   const foot=document.getElementById("sFoot");
   const needsPrac=requiresPractice(n);
-  if(st==="locked"){
+
+  if(isPortal(n)){
+    // PORTAL: no se practica solo. Se abre para revelar sus ramificaciones.
+    const {done,total}=portalDoneCount(n);
+    if(st==="done"){
+      foot.innerHTML=`<button class="cta" id="ctaBtn" style="background:${b.css}">Rama integrada ✓ · explorar</button>`;
+      document.getElementById("ctaBtn").onclick=backClose;
+    }else if(PRAC[n.id] || done>0){
+      foot.innerHTML=`<button class="cta" id="ctaBtn" style="background:${b.css}">Ver sus caminos →</button>`;
+      document.getElementById("ctaBtn").onclick=()=>{ backClose(); setTimeout(()=>revealNextPath(n),300); };
+    }else{
+      foot.innerHTML=`<button class="cta" id="ctaBtn" style="background:${b.css}">Abrir esta rama</button>`;
+      document.getElementById("ctaBtn").onclick=()=>openPortal(n);
+    }
+  }else if(st==="locked"){
     foot.innerHTML=`<button class="cta disabled">🔒 Completa los requisitos para marcar</button>`;
   }else if(st==="done"){
     foot.innerHTML=`<button class="cta undo" id="ctaBtn">Ya no lo mantengo — desmarcar</button>`+
@@ -3256,7 +3356,6 @@ function open(n){
     const rp=document.getElementById("ctaReplay");
     if(rp) rp.onclick=()=>replayNode(n);
   }else if(!needsPrac){
-    // nodo conceptual / raíz: marcar directo
     foot.innerHTML=`<button class="cta" id="ctaBtn">✓ Marcar como hecho</button>`;
     document.getElementById("ctaBtn").onclick=()=>{ markDone(n); open(n); };
   }else if(st==="available"){
@@ -3284,6 +3383,10 @@ function open(n){
   // wire registro de minutos de hoy
   document.querySelectorAll(".lt-min").forEach(btn=>{
     btn.onclick=()=>logMinutes(n, +btn.dataset.min);
+  });
+  // wire mapa de crecimiento (ir a una ramificación)
+  document.querySelectorAll(".g-item").forEach(el=>{
+    el.onclick=()=>{ const k=byId[el.dataset.goto]; if(k){ centerOn(k.x,k.y,.92); setTimeout(()=>open(k),300); } };
   });
   // wire bitácora: selección de score
   let jrSel=null;
@@ -3503,6 +3606,7 @@ function branchStats(){
   Object.keys(BRANCHES).forEach(k=>{ if(k!=="core") stats[k]={done:0,total:0}; });
   NODES.forEach(n=>{
     if(n.branch==="core"||!stats[n.branch]) return;
+    if(isPortal(n)) return;   // el portal no cuenta: la rama son sus ramificaciones
     stats[n.branch].total++;
     if(DONE.has(n.id)) stats[n.branch].done++;
   });
@@ -3516,7 +3620,7 @@ function branchStats(){
    sobre-disciplina. El "ego depletion" de Baumeister se cita con matiz:
    replicaciones recientes (2016) lo discuten, por eso no se presenta como ley. */
 function effortStatus(){
-  const practicing=NODES.filter(n=>PRAC[n.id]);
+  const practicing=NODES.filter(n=>PRAC[n.id]&&!isPortal(n));
   if(practicing.length===0) return null;
   const active=practicing.filter(n=>daysAgo(PRAC[n.id].lastTouch)<=3);
   if(active.length>=4){
@@ -3568,7 +3672,7 @@ function openSummary(){
 
   // TU VERDADERO NORTE — reencuadre honesto de la meta
   const mastered=NODES.filter(n=>DONE.has(n.id)&&n.tier>0).length;
-  const practicingN=NODES.filter(n=>PRAC[n.id]).length;
+  const practicingN=NODES.filter(n=>PRAC[n.id]&&!isPortal(n)).length;
   let norteMsg;
   if(done<=1){
     norteMsg="No estás aquí para ser mejor que el 99% de la gente. Esa meta se desinfla el primer día malo. Estás aquí para ser mejor que tú de ayer — la única comparación que nunca te traiciona, porque depende solo de ti.";
@@ -3606,7 +3710,7 @@ function openSummary(){
   }
 
   // DETECTOR DE ABANDONO
-  const practicing=NODES.filter(n=>PRAC[n.id]);
+  const practicing=NODES.filter(n=>PRAC[n.id]&&!isPortal(n));
   const stale=practicing.map(n=>({n,last:daysAgo(PRAC[n.id].lastTouch)}))
                         .filter(o=>o.last>=4).sort((a,b)=>b.last-a.last);
   const active=practicing.filter(n=>daysAgo(PRAC[n.id].lastTouch)<4);
@@ -3709,19 +3813,20 @@ function openSummary(){
 }
 document.getElementById("summary").onclick=openSummary;
 
+/* ---------- abrir un portal (rama mayor) ---------- */
+function openPortal(n){
+  PRAC[n.id]={started:todayKey(), lastTouch:todayKey(), _portal:true};
+  savePrac(); refreshAll();
+  backClose();
+  setTimeout(()=>revealNextPath(n), 320);
+}
+
 /* ---------- empezar práctica / dominar / retroceder ---------- */
 function startPractice(n){
-  const wasTier1=n.tier===1;
   PRAC[n.id]={started:todayKey(), lastTouch:todayKey()};
   savePrac(); refreshAll();
-  if(wasTier1){
-    // cerrar el panel y mostrar cinemáticamente el siguiente camino que se abre
-    backClose();
-    setTimeout(()=>revealNextPath(n), 360);
-  }else{
-    open(n);
-    toast(`Empezaste a practicar: ${n.title}`);
-  }
+  open(n);
+  toast(`Empezaste a practicar: ${n.title}`);
 }
 function abandonPractice(n){
   delete PRAC[n.id]; savePrac(); refreshAll(); open(n);
@@ -4503,7 +4608,7 @@ function buildReminders(){
   const out=[];
   // 1) hábitos de nodos en práctica sin registrar hoy
   const tk=todayKey();
-  const practicing=NODES.filter(n=>PRAC[n.id]);
+  const practicing=NODES.filter(n=>PRAC[n.id]&&!isPortal(n));
   let pendingHabits=0;
   practicing.forEach(n=>{
     (n.habits||[]).forEach(h=>{ const r=HAB[h]; if(!r||r.last!==tk) pendingHabits++; });
